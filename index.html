@@ -4,139 +4,557 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sidewinders Stats</title>
+    
+    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- DataTables CSS -->
     <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.9/css/responsive.bootstrap5.min.css">
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
     <style>
-        body { background: #f8f9fa; }
-        .navbar { background: #1e3a8a; }
-        .stat-card { background: white; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .player-select { max-width: 300px; }
-        .win-high { background-color: #d4edda !important; }
-        .loss-high { background-color: #f8d7da !important; }
+        :root {
+            --primary-color: #1e3a8a;
+            --secondary-color: #3b82f6;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar {
+            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e5e7eb;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.12);
+        }
+        
+        .section-title {
+            color: var(--primary-color);
+            font-weight: 700;
+            border-left: 4px solid var(--secondary-color);
+            padding-left: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .player-select {
+            max-width: 400px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 10px 15px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .player-select:focus {
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card-title {
+            color: var(--primary-color);
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .table-hover tbody tr:hover {
+            background-color: #f8fafc;
+            cursor: pointer;
+        }
+        
+        .badge-win {
+            background-color: var(--success-color);
+        }
+        
+        .badge-loss {
+            background-color: var(--danger-color);
+        }
+        
+        .badge-draw {
+            background-color: var(--warning-color);
+        }
+        
+        .last-updated {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+        
+        .share-btn {
+            background: linear-gradient(90deg, var(--success-color), #34d399);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
+        }
+        
+        .share-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+        
+        .clickable-player {
+            color: var(--secondary-color);
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+        
+        .clickable-player:hover {
+            color: var(--primary-color);
+            text-decoration: underline;
+        }
+        
+        .table-success-light {
+            background-color: rgba(16, 185, 129, 0.1) !important;
+        }
+        
+        .table-danger-light {
+            background-color: rgba(239, 68, 68, 0.1) !important;
+        }
+        
+        .footer {
+            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            padding: 20px 0;
+            margin-top: 40px;
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .stat-card {
+                padding: 15px;
+                margin-bottom: 15px;
+            }
+            
+            .section-title {
+                font-size: 1.5rem;
+            }
+            
+            .navbar-brand {
+                font-size: 1.2rem;
+            }
+        }
+        
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease forwards;
+        }
     </style>
 </head>
 <body>
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" class="container mt-5 text-center" style="display: none;">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-3 text-muted">Loading Sidewinders Stats...</p>
+    </div>
+
     <!-- Navigation -->
-    <nav class="navbar navbar-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
         <div class="container">
-            <span class="navbar-brand mb-0 h1">🏆 Sidewinders Stats</span>
-            <div>
-                <a href="#league" class="btn btn-outline-light btn-sm me-2">League Table</a>
-                <a href="#analysis" class="btn btn-outline-light btn-sm">Player Analysis</a>
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-futbol me-2"></i> Sidewinders Stats
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#league">
+                            <i class="fas fa-table me-1"></i> League Table
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#analysis">
+                            <i class="fas fa-chart-line me-1"></i> Player Analysis
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="window.location.reload();">
+                            <i class="fas fa-sync-alt me-1"></i> Refresh
+                        </a>
+                    </li>
+                </ul>
             </div>
         </div>
     </nav>
 
     <div class="container mt-4">
-        <!-- League Table Section -->
-        <section id="league" class="mb-5">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h2>League Table</h2>
-                <small class="text-muted">Last updated: <span id="lastUpdated"></span></small>
+        <!-- Header -->
+        <div class="row mb-4 fade-in">
+            <div class="col-12">
+                <div class="stat-card text-center">
+                    <h1 class="display-6 fw-bold text-primary mb-2">🏆 Sidewinders Football Statistics</h1>
+                    <p class="lead text-muted mb-3">Track player performances, partnerships, and team dynamics</p>
+                    <div class="last-updated">
+                        <i class="fas fa-clock me-1"></i>
+                        Last updated: <span id="lastUpdated">Loading...</span>
+                        <span class="badge bg-secondary ms-2">CSV Version</span>
+                    </div>
+                </div>
             </div>
+        </div>
+
+        <!-- League Table Section -->
+        <section id="league" class="mb-5 fade-in">
+            <h2 class="section-title">
+                <i class="fas fa-trophy me-2"></i> League Table
+            </h2>
+            
             <div class="stat-card">
-                <table id="leagueTable" class="table table-striped table-hover">
-                    <thead>
-                        <tr>
-                            <th>Player</th>
-                            <th>Games</th>
-                            <th>Wins</th>
-                            <th>Draws</th>
-                            <th>Losses</th>
-                            <th>Goals</th>
-                            <th>Assists</th>
-                            <th>Win %</th>
-                            <th>PPG</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Filled by JavaScript -->
-                    </tbody>
-                </table>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Player Rankings</h5>
+                    <small class="text-muted">Click any player name to view their detailed analysis</small>
+                </div>
+                
+                <div class="table-responsive">
+                    <table id="leagueTable" class="table table-hover table-striped" style="width:100%">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Player</th>
+                                <th class="text-center">Games</th>
+                                <th class="text-center">Wins</th>
+                                <th class="text-center">Draws</th>
+                                <th class="text-center">Losses</th>
+                                <th class="text-center">Goals</th>
+                                <th class="text-center">Assists</th>
+                                <th class="text-center">Win %</th>
+                                <th class="text-center">PPG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mt-3 text-muted small">
+                    <i class="fas fa-info-circle me-1"></i>
+                    PPG = Points Per Game (Win=3, Draw=1, Loss=0)
+                </div>
             </div>
         </section>
 
         <!-- Player Analysis Section -->
-        <section id="analysis" class="mb-5">
-            <h2 class="mb-3">Player Analysis</h2>
+        <section id="analysis" class="mb-5 fade-in">
+            <h2 class="section-title">
+                <i class="fas fa-user-chart me-2"></i> Player Analysis
+            </h2>
             
             <!-- Player Selector -->
-            <div class="stat-card mb-4">
-                <h5>Select a Player</h5>
-                <select id="playerSelect" class="form-select player-select">
-                    <option value="">Choose a player...</option>
-                </select>
+            <div class="stat-card">
+                <h5 class="mb-3">Select a Player to Analyze</h5>
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <select id="playerSelect" class="form-select player-select">
+                            <option value="">Choose a player...</option>
+                            <!-- Options populated by JavaScript -->
+                        </select>
+                    </div>
+                    <div class="col-md-4 mt-2 mt-md-0">
+                        <div class="d-grid">
+                            <button class="btn btn-primary" onclick="shareCurrentPlayer()" id="shareButton" disabled>
+                                <i class="fas fa-share-alt me-1"></i> Share Analysis
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-2 text-muted small">
+                    <i class="fas fa-mouse-pointer me-1"></i>
+                    You can also click any player name in the League Table above
+                </div>
             </div>
 
-            <!-- Player Stats -->
+            <!-- Player Stats Dashboard -->
             <div id="playerStats" class="stat-card" style="display: none;">
-                <h4 id="playerName"></h4>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3 id="playerName" class="mb-0"></h3>
+                    <button class="share-btn" onclick="shareCurrentPlayer()">
+                        <i class="fas fa-share-alt me-1"></i> Share
+                    </button>
+                </div>
+                
+                <!-- Player Summary Cards -->
                 <div class="row mb-4">
-                    <div class="col-md-3">
-                        <div class="card text-center">
+                    <div class="col-xl-3 col-lg-6 col-md-6 mb-3">
+                        <div class="card h-100 border-start border-primary border-4">
                             <div class="card-body">
-                                <h6 class="card-subtitle mb-2 text-muted">Games</h6>
-                                <h3 id="totalGames" class="card-title">0</h3>
+                                <h6 class="card-subtitle mb-2 text-muted">
+                                    <i class="fas fa-calendar-alt me-1"></i> Games Played
+                                </h6>
+                                <h2 id="totalGames" class="card-title text-primary">0</h2>
+                                <small class="text-muted">
+                                    <span class="badge bg-success">W: <span id="totalWins">0</span></span>
+                                    <span class="badge bg-warning ms-1">D: <span id="totalDraws">0</span></span>
+                                    <span class="badge bg-danger ms-1">L: <span id="totalLosses">0</span></span>
+                                </small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card text-center">
+                    
+                    <div class="col-xl-3 col-lg-6 col-md-6 mb-3">
+                        <div class="card h-100 border-start border-success border-4">
                             <div class="card-body">
-                                <h6 class="card-subtitle mb-2 text-muted">Win %</h6>
-                                <h3 id="winPercent" class="card-title">0%</h3>
+                                <h6 class="card-subtitle mb-2 text-muted">
+                                    <i class="fas fa-chart-line me-1"></i> Win Percentage
+                                </h6>
+                                <h2 id="winPercent" class="card-title text-success">0%</h2>
+                                <div class="progress mt-2" style="height: 6px;">
+                                    <div id="winPercentBar" class="progress-bar bg-success" style="width: 0%"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card text-center">
+                    
+                    <div class="col-xl-3 col-lg-6 col-md-6 mb-3">
+                        <div class="card h-100 border-start border-info border-4">
                             <div class="card-body">
-                                <h6 class="card-subtitle mb-2 text-muted">Goals</h6>
-                                <h3 id="totalGoals" class="card-title">0</h3>
+                                <h6 class="card-subtitle mb-2 text-muted">
+                                    <i class="fas fa-star me-1"></i> Points Per Game
+                                </h6>
+                                <h2 id="pointsPerGame" class="card-title text-info">0.0</h2>
+                                <small class="text-muted">Avg points per appearance</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card text-center">
+                    
+                    <div class="col-xl-3 col-lg-6 col-md-6 mb-3">
+                        <div class="card h-100 border-start border-warning border-4">
                             <div class="card-body">
-                                <h6 class="card-subtitle mb-2 text-muted">Assists</h6>
-                                <h3 id="totalAssists" class="card-title">0</h3>
+                                <h6 class="card-subtitle mb-2 text-muted">
+                                    <i class="fas fa-futbol me-1"></i> Goal Contributions
+                                </h6>
+                                <h2 id="totalGoals" class="card-title text-warning">0</h2>
+                                <small class="text-muted">
+                                    Goals: <span id="totalGoalsNum">0</span> | 
+                                    Assists: <span id="totalAssists">0</span> |
+                                    Own Goals: <span id="totalOwnGoals">0</span>
+                                </small>
                             </div>
                         </div>
                     </div>
                 </div>
-
+                
                 <!-- Partnership Analysis -->
-                <h5>Partnership Analysis</h5>
-                <table id="partnershipTable" class="table table-sm">
-                    <thead>
-                        <tr>
-                            <th>Teammate</th>
-                            <th>Games Together</th>
-                            <th>Same Team</th>
-                            <th>Opposite Team</th>
-                            <th>Win % Together</th>
-                            <th>H2H Win %</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Filled by JavaScript -->
-                    </tbody>
-                </table>
+                <h5 class="mb-3">
+                    <i class="fas fa-handshake me-2"></i> Partnership Analysis
+                </h5>
+                <div class="table-responsive">
+                    <table id="partnershipTable" class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Teammate</th>
+                                <th class="text-center">Games Together</th>
+                                <th class="text-center">Same Team</th>
+                                <th class="text-center">Opposite Team</th>
+                                <th class="text-center">Win % Together</th>
+                                <th class="text-center">H2H Win %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mt-3 text-muted small">
+                    <i class="fas fa-lightbulb me-1"></i>
+                    <strong>Win % Together:</strong> Win percentage when playing on the same team.
+                    <strong>H2H Win %:</strong> Your win percentage when playing against this player.
+                </div>
             </div>
         </section>
+        
+        <!-- Data Source Info -->
+        <div class="stat-card text-center fade-in">
+            <h5><i class="fas fa-database me-2"></i> Data Source</h5>
+            <p class="mb-2">This website loads data from CSV files exported from Google Sheets.</p>
+            <p class="mb-0 small text-muted">
+                <i class="fas fa-exclamation-circle me-1"></i>
+                To update statistics, upload new GameLog.csv and LeagueTable.csv files
+            </p>
+        </div>
     </div>
 
-    <!-- Data Table -->
-    <div id="dataContainer" style="display: none;">
-        <!-- Paste your exported JSON here -->
-    </div>
+    <!-- Footer -->
+    <footer class="footer mt-5">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h5 class="mb-2">Sidewinders Stats</h5>
+                    <p class="mb-0">Football statistics and analysis platform</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <small>
+                        Built with <i class="fas fa-heart text-danger"></i> for the Sidewinders team
+                        <br>
+                        <span id="versionInfo">v1.0 • Data updates manually</span>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </footer>
 
-    <!-- JavaScript -->
+    <!-- JavaScript Libraries -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
+    
+    <!-- Main Application -->
     <script src="app.js"></script>
+    
+    <!-- Additional Helper Functions -->
+    <script>
+        // Share current player analysis
+        function shareCurrentPlayer() {
+            const playerSelect = document.getElementById('playerSelect');
+            const playerName = playerSelect.value;
+            
+            if (!playerName) {
+                alert('Please select a player first.');
+                return;
+            }
+            
+            const currentUrl = new URL(window.location.href);
+            currentUrl.hash = `player-${encodeURIComponent(playerName)}`;
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(currentUrl.toString())
+                .then(() => {
+                    // Show success message
+                    const originalText = document.querySelector('#shareButton').innerHTML;
+                    document.querySelector('#shareButton').innerHTML = '<i class="fas fa-check me-1"></i> Copied!';
+                    document.querySelector('#shareButton').classList.remove('btn-primary');
+                    document.querySelector('#shareButton').classList.add('btn-success');
+                    
+                    setTimeout(() => {
+                        document.querySelector('#shareButton').innerHTML = originalText;
+                        document.querySelector('#shareButton').classList.remove('btn-success');
+                        document.querySelector('#shareButton').classList.add('btn-primary');
+                    }, 2000);
+                    
+                    // Also show a toast
+                    showToast(`Link to ${playerName}'s analysis copied to clipboard!`);
+                })
+                .catch(err => {
+                    console.error('Failed to copy:', err);
+                    alert('Failed to copy link. You can manually copy the URL from your browser.');
+                });
+        }
+        
+        // Show toast notification
+        function showToast(message) {
+            // Create toast element
+            const toast = document.createElement('div');
+            toast.className = 'position-fixed bottom-0 end-0 p-3';
+            toast.style.zIndex = '11';
+            
+            toast.innerHTML = `
+                <div class="toast show" role="alert">
+                    <div class="toast-header bg-success text-white">
+                        <strong class="me-auto"><i class="fas fa-check-circle me-1"></i> Success</strong>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+                    </div>
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // Auto-remove after 3 seconds
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+        
+        // Update share button state
+        function updateShareButton() {
+            const playerSelect = document.getElementById('playerSelect');
+            const shareButton = document.getElementById('shareButton');
+            
+            if (playerSelect.value) {
+                shareButton.disabled = false;
+            } else {
+                shareButton.disabled = true;
+            }
+        }
+        
+        // Listen for player selection changes
+        document.addEventListener('DOMContentLoaded', function() {
+            const playerSelect = document.getElementById('playerSelect');
+            playerSelect.addEventListener('change', updateShareButton);
+            
+            // Set version info
+            document.getElementById('versionInfo').textContent = 
+                `v1.0 • Last update: ${new Date().toLocaleDateString()}`;
+        });
+        
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href');
+                if (targetId === '#') return;
+                
+                const targetElement = document.querySelector(targetId);
+                if (targetElement) {
+                    window.scrollTo({
+                        top: targetElement.offsetTop - 20,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+    </script>
 </body>
 </html>
