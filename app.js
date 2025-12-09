@@ -1,4 +1,4 @@
-// Sidewinders Stats - Updated with fixes
+// Sidewinders Stats - Complete with mobile fixes
 class SidewindersStats {
     constructor() {
         this.gameLog = [];
@@ -62,7 +62,9 @@ class SidewindersStats {
                 OwnGoals: 0,
                 Assists: 0,
                 Penalties: 0,
-                TotalPoints: 0
+                TotalPoints: 0,
+                PPG: 0,
+                WinPercent: 0
             };
         });
         
@@ -91,9 +93,18 @@ class SidewindersStats {
             stats.Penalties += parseInt(game['Pen']) || 0;
         });
         
+        Object.values(playerStats).forEach(stats => {
+            if (stats.Games > 0) {
+                stats.PPG = Math.round((stats.TotalPoints / stats.Games) * 10) / 10;
+                stats.WinPercent = Math.round((stats.Wins / stats.Games) * 100 * 10) / 10;
+            }
+        });
+        
         this.leagueTable = Object.values(playerStats)
             .sort((a, b) => {
                 if (b.TotalPoints !== a.TotalPoints) return b.TotalPoints - a.TotalPoints;
+                if (b.PPG !== a.PPG) return b.PPG - a.PPG;
+                if (b.WinPercent !== a.WinPercent) return b.WinPercent - a.WinPercent;
                 if (b.Goals !== a.Goals) return b.Goals - a.Goals;
                 if (b.Assists !== a.Assists) return b.Assists - a.Assists;
                 return a.Player.localeCompare(b.Player);
@@ -185,7 +196,7 @@ class SidewindersStats {
     
     initLeagueTable() {
         if (this.leagueTable.length === 0) {
-            $('#leagueTable').html('<tr><td colspan="10" class="text-center">No game data available</td></tr>');
+            $('#leagueTable').html('<tr><td colspan="12" class="text-center">No game data available</td></tr>');
             return;
         }
         
@@ -198,7 +209,7 @@ class SidewindersStats {
             columns: [
                 { 
                     data: 'Player',
-                    className: 'fw-bold clickable-player',
+                    className: 'fw-bold clickable-player sticky-column',
                     render: function(data, type, row) {
                         return `<span class="clickable-player">${data}</span>`;
                     }
@@ -253,11 +264,40 @@ class SidewindersStats {
                         }
                         return `<strong class="points-badge">${data}</strong>`;
                     }
+                },
+                { 
+                    data: 'PPG',
+                    className: 'text-center fw-bold',
+                    title: 'PPG',
+                    render: function(data, type, row) {
+                        if (type === 'sort' || type === 'type') {
+                            return data;
+                        }
+                        return `<span class="ppg-value">${data.toFixed(1)}</span>`;
+                    }
+                },
+                { 
+                    data: 'WinPercent',
+                    className: 'text-center',
+                    title: 'Win %',
+                    render: function(data, type, row) {
+                        if (type === 'sort' || type === 'type') {
+                            return data;
+                        }
+                        let color = '#dc3545';
+                        if (data >= 60) color = '#198754';
+                        else if (data >= 40) color = '#fd7e14';
+                        
+                        return `<span style="color: ${color}; font-weight: bold">${data}%</span>`;
+                    }
                 }
             ],
-            order: [[9, 'desc']], // Default sort by Total Points (column 9) descending
+            order: [[9, 'desc']],
             pageLength: 25,
-            responsive: true,
+            responsive: false,
+            scrollX: true,
+            scrollCollapse: true,
+            fixedHeader: true,
             language: {
                 search: "Search players:",
                 lengthMenu: "Show _MENU_ entries",
@@ -315,15 +355,11 @@ class SidewindersStats {
             $('#totalOwnGoals').text(playerStats.OwnGoals);
             $('#totalPenalties').text(playerStats.Penalties);
             
-            // Calculate Goal Contributions (Goals + Assists, excluding Own Goals)
             const goalContributions = playerStats.Goals + playerStats.Assists;
             $('#goalContributions').text(goalContributions);
             
-            // Calculate win percentage
-            const winPercent = playerStats.Games > 0 ? 
-                Math.round((playerStats.Wins / playerStats.Games) * 100) : 0;
-            $('#winPercent').text(winPercent + '%');
-            $('#winPercentBar').css('width', winPercent + '%');
+            $('#winPercent').text(playerStats.WinPercent + '%');
+            $('#winPercentBar').css('width', playerStats.WinPercent + '%');
         }
         
         $('#playerStats').show();
