@@ -1,81 +1,127 @@
-// Sidewinders Stats - Fixed mobile loading and columns
+// Sidewinders Stats - Simplified working version
 class SidewindersStats {
     constructor() {
         this.gameLog = [];
         this.leagueTable = [];
         this.players = [];
         this.selectedPlayer = null;
-        this.isLoading = false;
         
-        // Initialize when DOM is ready
-        $(document).ready(() => {
-            console.log('DOM ready, initializing app...');
-            this.init();
-        });
+        // Initialize immediately
+        this.init();
     }
     
     async init() {
         try {
-            console.log('Starting initialization...');
-            this.showLoading(true);
-            this.isLoading = true;
+            // Show loading
+            $('#loadingIndicator').show();
             
+            // Load data
             await this.loadAllData();
-            console.log('Data loaded, calculating league table...');
-            
             this.calculateLeagueTable();
-            console.log('League table calculated, initializing components...');
             
+            // Initialize components
             this.initLeagueTable();
             this.initPlayerSelector();
             this.updateLastUpdated();
             
-            this.isLoading = false;
-            this.showLoading(false);
-            console.log('Initialization complete!');
+            // Hide loading
+            $('#loadingIndicator').hide();
+            
+            console.log('App initialized successfully!');
             
         } catch (error) {
             console.error('Initialization error:', error);
-            this.showError('Failed to load data. Please check GameLog.csv file.');
-            this.showLoading(false);
-            this.isLoading = false;
+            $('#loadingIndicator').hide();
+            alert('Error loading data. Please check console for details.');
         }
     }
     
     async loadAllData() {
-        console.log('Loading CSV data...');
         try {
-            // First try to load the CSV
-            const gameLogCSV = await this.fetchCSV('GameLog.csv');
+            // Load CSV file
+            const response = await fetch('GameLog.csv');
+            const csvText = await response.text();
             
-            if (!gameLogCSV) {
-                throw new Error('GameLog.csv is empty or not found');
-            }
-            
-            console.log('CSV loaded, parsing data...');
-            this.gameLog = this.parseCSV(gameLogCSV);
-            
-            if (this.gameLog.length === 0) {
-                throw new Error('No data found in GameLog.csv');
-            }
+            // Parse CSV
+            this.gameLog = this.parseCSV(csvText);
             
             // Extract unique players
-            this.players = [...new Set(this.gameLog.map(row => row['Player']))]
-                .filter(name => name && name.trim() !== '')
-                .sort();
+            const playerSet = new Set();
+            this.gameLog.forEach(row => {
+                if (row['Player']) {
+                    playerSet.add(row['Player']);
+                }
+            });
+            this.players = Array.from(playerSet).sort();
             
             console.log(`Loaded ${this.gameLog.length} game records`);
-            console.log(`Found ${this.players.length} unique players`);
+            console.log(`Found ${this.players.length} players`);
             
         } catch (error) {
-            console.error('Error in loadAllData:', error);
+            console.error('Error loading CSV:', error);
             throw error;
         }
     }
     
-    calculateLeagueTable() {
-        console.log('Calculating league table from game log...');
+    parseCSV(csvText) {
+        if (!csvText) return [];
         
+        const lines = csvText.split('\n').filter(line => line.trim() !== '');
+        if (lines.length < 2) return [];
+        
+        // Parse headers
+        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+        
+        // Parse data rows
+        const data = [];
+        for (let i = 1; i < lines.length; i++) {
+            const values = this.parseCSVLine(lines[i]);
+            const row = {};
+            
+            headers.forEach((header, index) => {
+                if (values[index] !== undefined) {
+                    let value = values[index].replace(/"/g, '').trim();
+                    
+                    // Convert numeric columns
+                    if (['Gls', 'OG', 'Ast', 'Pen'].includes(header)) {
+                        value = parseInt(value) || 0;
+                    }
+                    
+                    row[header] = value;
+                }
+            });
+            
+            if (Object.keys(row).length > 0) {
+                data.push(row);
+            }
+        }
+        
+        return data;
+    }
+    
+    parseCSVLine(line) {
+        const values = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            
+            if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+                values.push(current);
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        
+        values.push(current);
+        return values;
+    }
+    
+    calculateLeagueTable() {
         const playerStats = {};
         
         // Initialize all players
@@ -96,7 +142,7 @@ class SidewindersStats {
             };
         });
         
-        // Process each game record
+        // Process game logs
         this.gameLog.forEach(game => {
             const player = game['Player'];
             if (!player || !playerStats[player]) return;
@@ -105,293 +151,115 @@ class SidewindersStats {
             
             stats.Games++;
             
-            const result = game['Result'];
-            if (result === 'Win') {
+            // Points calculation
+            if (game['Result'] === 'Win') {
                 stats.Wins++;
                 stats.TotalPoints += 3;
-            } else if (result === 'Draw') {
+            } else if (game['Result'] === 'Draw') {
                 stats.Draws++;
                 stats.TotalPoints += 1;
-            } else if (result === 'Loss') {
+            } else if (game['Result'] === 'Loss') {
                 stats.Losses++;
             }
             
-            stats.Goals += parseInt(game['Gls']) || 0;
-            stats.OwnGoals += parseInt(game['OG']) || 0;
-            stats.Assists += parseInt(game['Ast']) || 0;
-            stats.Penalties += parseInt(game['Pen']) || 0;
+            // Stats
+            stats.Goals += game['Gls'] || 0;
+            stats.OwnGoals += game['OG'] || 0;
+            stats.Assists += game['Ast'] || 0;
+            stats.Penalties += game['Pen'] || 0;
         });
         
-        // Calculate PPG and Win Percent for each player
+        // Calculate PPG and Win Percent
         Object.values(playerStats).forEach(stats => {
             if (stats.Games > 0) {
-                stats.PPG = Math.round((stats.TotalPoints / stats.Games) * 10) / 10;
-                stats.WinPercent = Math.round((stats.Wins / stats.Games) * 100 * 10) / 10;
+                stats.PPG = (stats.TotalPoints / stats.Games).toFixed(1);
+                stats.WinPercent = ((stats.Wins / stats.Games) * 100).toFixed(1);
             }
         });
         
         // Sort by Total Points, then PPG, then Win Percent
-        this.leagueTable = Object.values(playerStats)
-            .sort((a, b) => {
-                if (b.TotalPoints !== a.TotalPoints) return b.TotalPoints - a.TotalPoints;
-                if (b.PPG !== a.PPG) return b.PPG - a.PPG;
-                if (b.WinPercent !== a.WinPercent) return b.WinPercent - a.WinPercent;
-                if (b.Goals !== a.Goals) return b.Goals - a.Goals;
-                if (b.Assists !== a.Assists) return b.Assists - a.Assists;
-                return a.Player.localeCompare(b.Player);
-            });
-        
-        console.log(`League table calculated: ${this.leagueTable.length} players`);
-    }
-    
-    async fetchCSV(filename) {
-        console.log(`Fetching ${filename}...`);
-        try {
-            // Use cache-busting for mobile to avoid stale data
-            const url = `${filename}?t=${Date.now()}`;
-            const response = await fetch(url);
-            
-            if (!response.ok) {
-                throw new Error(`Failed to fetch ${filename}: ${response.status} ${response.statusText}`);
-            }
-            
-            const text = await response.text();
-            console.log(`${filename} loaded successfully (${text.length} chars)`);
-            return text;
-            
-        } catch (error) {
-            console.error(`Error fetching ${filename}:`, error);
-            
-            // Try alternative approach for mobile
-            try {
-                console.log('Trying alternative fetch method...');
-                const response = await fetch(filename, {
-                    cache: 'no-store',
-                    headers: {
-                        'Cache-Control': 'no-cache'
-                    }
-                });
-                return await response.text();
-            } catch (retryError) {
-                console.error('Alternative fetch also failed:', retryError);
-                return null;
-            }
-        }
-    }
-    
-    parseCSV(csvText) {
-        if (!csvText || csvText.trim() === '') {
-            console.warn('CSV text is empty');
-            return [];
-        }
-        
-        const lines = csvText.split('\n').filter(line => line.trim() !== '');
-        if (lines.length < 2) {
-            console.warn('CSV has less than 2 lines');
-            return [];
-        }
-        
-        // Parse headers
-        const headers = this.parseCSVLine(lines[0]).map(h => 
-            h.replace(/^"(.*)"$/, '$1').trim()
-        );
-        
-        console.log('CSV headers:', headers);
-        
-        // Parse data rows
-        const data = [];
-        for (let i = 1; i < lines.length; i++) {
-            const values = this.parseCSVLine(lines[i]);
-            if (values.length === 0) continue;
-            
-            const row = {};
-            headers.forEach((header, index) => {
-                if (values[index] !== undefined) {
-                    let value = values[index];
-                    value = value.replace(/^"(.*)"$/, '$1').trim();
-                    
-                    // Convert numeric columns
-                    const numericColumns = ['Gls', 'OG', 'Ast', 'Pen'];
-                    if (numericColumns.includes(header) && !isNaN(value) && value !== '') {
-                        value = Number(value);
-                    }
-                    
-                    row[header] = value;
-                }
-            });
-            
-            if (Object.keys(row).length > 0 && row[headers[0]]) {
-                data.push(row);
-            }
-        }
-        
-        console.log(`Parsed ${data.length} rows from CSV`);
-        return data;
-    }
-    
-    parseCSVLine(line) {
-        const values = [];
-        let currentValue = '';
-        let insideQuotes = false;
-        
-        for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            const nextChar = line[i + 1];
-            
-            if (char === '"') {
-                if (insideQuotes && nextChar === '"') {
-                    currentValue += '"';
-                    i++;
-                } else {
-                    insideQuotes = !insideQuotes;
-                }
-            } else if (char === ',' && !insideQuotes) {
-                values.push(currentValue);
-                currentValue = '';
-            } else {
-                currentValue += char;
-            }
-        }
-        
-        values.push(currentValue);
-        return values;
+        this.leagueTable = Object.values(playerStats).sort((a, b) => {
+            if (b.TotalPoints !== a.TotalPoints) return b.TotalPoints - a.TotalPoints;
+            if (parseFloat(b.PPG) !== parseFloat(a.PPG)) return parseFloat(b.PPG) - parseFloat(a.PPG);
+            return parseFloat(b.WinPercent) - parseFloat(a.WinPercent);
+        });
     }
     
     initLeagueTable() {
-        console.log('Initializing league table...');
+        // Clear existing table
+        $('#leagueTable').empty();
         
-        if (this.leagueTable.length === 0) {
-            $('#leagueTable').html('<tr><td colspan="12" class="text-center">No game data available</td></tr>');
-            return;
-        }
+        // Create table structure
+        const table = $('<table>').addClass('table table-hover table-striped').attr('id', 'leagueTable').css('width', '100%');
+        const thead = $('<thead>').addClass('table-dark');
+        const tbody = $('<tbody>');
         
-        // Destroy existing DataTable if it exists
-        if ($.fn.DataTable.isDataTable('#leagueTable')) {
-            $('#leagueTable').DataTable().destroy();
-            $('#leagueTable').empty();
-        }
+        // Create header
+        const headerRow = $('<tr>');
+        [
+            'Player', 'Games', 'Wins', 'Draws', 'Losses', 
+            'Goals', 'Own Goals', 'Assists', 'Penalties', 
+            'Total Points', 'PPG', 'Win %'
+        ].forEach(text => {
+            const th = $('<th>').text(text);
+            if (text !== 'Player') th.addClass('text-center');
+            headerRow.append(th);
+        });
+        thead.append(headerRow);
         
-        // Create table with proper mobile scrolling
-        const table = $('#leagueTable').DataTable({
-            data: this.leagueTable,
-            columns: [
-                { 
-                    data: 'Player',
-                    className: 'fw-bold clickable-player',
-                    render: function(data, type, row) {
-                        return `<span class="clickable-player">${data}</span>`;
-                    }
-                },
-                { 
-                    data: 'Games',
-                    className: 'text-center',
-                    title: 'Games'
-                },
-                { 
-                    data: 'Wins',
-                    className: 'text-center',
-                    title: 'Wins'
-                },
-                { 
-                    data: 'Draws',
-                    className: 'text-center',
-                    title: 'Draws'
-                },
-                { 
-                    data: 'Losses',
-                    className: 'text-center',
-                    title: 'Losses'
-                },
-                { 
-                    data: 'Goals',
-                    className: 'text-center fw-bold text-primary',
-                    title: 'Goals'
-                },
-                { 
-                    data: 'OwnGoals',
-                    className: 'text-center',
-                    title: 'Own Goals'
-                },
-                { 
-                    data: 'Assists',
-                    className: 'text-center',
-                    title: 'Assists'
-                },
-                { 
-                    data: 'Penalties',
-                    className: 'text-center',
-                    title: 'Penalties'
-                },
-                { 
-                    data: 'TotalPoints',
-                    className: 'text-center fw-bold text-success',
-                    title: 'Total Points',
-                    render: function(data, type, row) {
-                        if (type === 'sort' || type === 'type') {
-                            return data;
-                        }
-                        return `<strong class="points-badge">${data}</strong>`;
-                    }
-                },
-                { 
-                    data: 'PPG',
-                    className: 'text-center fw-bold',
-                    title: 'PPG',
-                    render: function(data, type, row) {
-                        if (type === 'sort' || type === 'type') {
-                            return data;
-                        }
-                        return `<span class="ppg-value">${data.toFixed(1)}</span>`;
-                    }
-                },
-                { 
-                    data: 'WinPercent',
-                    className: 'text-center',
-                    title: 'Win %',
-                    render: function(data, type, row) {
-                        if (type === 'sort' || type === 'type') {
-                            return data;
-                        }
-                        let color = '#dc3545';
-                        if (data >= 60) color = '#198754';
-                        else if (data >= 40) color = '#fd7e14';
-                        
-                        return `<span style="color: ${color}; font-weight: bold">${data}%</span>`;
-                    }
-                }
-            ],
-            order: [[9, 'desc']], // Default sort by Total Points (column 9)
-            pageLength: 25,
-            responsive: true,
-            scrollX: true,
-            scrollCollapse: true,
-            fixedHeader: true,
-            language: {
-                search: "Search players:",
-                lengthMenu: "Show _MENU_ entries",
-                info: "Showing _START_ to _END_ of _TOTAL_ players"
-            },
-            initComplete: function() {
-                console.log('DataTable initialization complete');
-            }
+        // Create rows
+        this.leagueTable.forEach(player => {
+            const row = $('<tr>');
+            
+            // Player name (clickable)
+            const playerCell = $('<td>').addClass('fw-bold clickable-player').text(player.Player);
+            playerCell.click(() => this.selectPlayer(player.Player));
+            row.append(playerCell);
+            
+            // Basic stats
+            [
+                player.Games, player.Wins, player.Draws, player.Losses,
+                player.Goals, player.OwnGoals, player.Assists, player.Penalties
+            ].forEach(value => {
+                const td = $('<td>').addClass('text-center').text(value);
+                if (value === player.Goals) td.addClass('text-primary fw-bold');
+                row.append(td);
+            });
+            
+            // Total Points
+            const pointsCell = $('<td>').addClass('text-center text-success fw-bold')
+                .html(`<span class="points-badge">${player.TotalPoints}</span>`);
+            row.append(pointsCell);
+            
+            // PPG
+            const ppgCell = $('<td>').addClass('text-center fw-bold')
+                .html(`<span class="ppg-value">${player.PPG}</span>`);
+            row.append(ppgCell);
+            
+            // Win %
+            const winPercent = parseFloat(player.WinPercent);
+            let winColor = '#dc3545';
+            if (winPercent >= 60) winColor = '#198754';
+            else if (winPercent >= 40) winColor = '#fd7e14';
+            
+            const winCell = $('<td>').addClass('text-center')
+                .html(`<span style="color: ${winColor}; font-weight: bold">${player.WinPercent}%</span>`);
+            row.append(winCell);
+            
+            tbody.append(row);
         });
         
-        // Click handler for player names
-        $('#leagueTable').on('click', 'tbody td:first-child', (event) => {
-            const playerName = $(event.target).text().trim();
-            if (playerName && this.players.includes(playerName)) {
-                this.selectPlayer(playerName);
-                $('html, body').animate({
-                    scrollTop: $('#analysis').offset().top - 20
-                }, 500);
-            }
-        });
+        // Assemble table
+        table.append(thead).append(tbody);
         
-        console.log('League table initialized with', this.leagueTable.length, 'players');
+        // Replace existing table
+        $('#leagueTable').replaceWith(table);
+        
+        // Add horizontal scroll wrapper for mobile
+        $('table#leagueTable').wrap('<div class="table-responsive"></div>');
     }
     
     initPlayerSelector() {
-        console.log('Initializing player selector...');
         const select = $('#playerSelect');
         select.empty();
         select.append('<option value="">Choose a player...</option>');
@@ -400,52 +268,47 @@ class SidewindersStats {
             select.append(`<option value="${player}">${player}</option>`);
         });
         
-        select.off('change').on('change', (e) => {
+        select.change((e) => {
             const player = e.target.value;
             if (player) {
                 this.selectPlayer(player);
             }
         });
-        
-        console.log('Player selector initialized with', this.players.length, 'players');
     }
     
     selectPlayer(playerName) {
-        console.log('Selecting player:', playerName);
         this.selectedPlayer = playerName;
         $('#playerSelect').val(playerName);
         this.showPlayerAnalysis(playerName);
     }
     
     showPlayerAnalysis(playerName) {
-        console.log('Showing analysis for:', playerName);
+        // Show section
+        $('#playerStats').show();
         $('#playerName').text(playerName);
         
-        const playerStats = this.leagueTable.find(row => row.Player === playerName);
+        // Find player stats
+        const playerStats = this.leagueTable.find(p => p.Player === playerName);
+        if (!playerStats) return;
         
-        if (playerStats) {
-            // Update all stats
-            $('#totalGames').text(playerStats.Games);
-            $('#totalWins').text(playerStats.Wins);
-            $('#totalDraws').text(playerStats.Draws);
-            $('#totalLosses').text(playerStats.Losses);
-            $('#totalPoints').text(playerStats.TotalPoints);
-            $('#totalGoals').text(playerStats.Goals);
-            $('#totalAssists').text(playerStats.Assists);
-            $('#totalOwnGoals').text(playerStats.OwnGoals);
-            $('#totalPenalties').text(playerStats.Penalties);
-            
-            // Calculate Goal Contributions (Goals + Assists)
-            const goalContributions = playerStats.Goals + playerStats.Assists;
-            $('#goalContributions').text(goalContributions);
-            
-            // Set win percentage
-            $('#winPercent').text(playerStats.WinPercent + '%');
-            $('#winPercentBar').css('width', playerStats.WinPercent + '%');
-        }
+        // Update basic stats
+        $('#totalGames').text(playerStats.Games);
+        $('#totalWins').text(playerStats.Wins);
+        $('#totalDraws').text(playerStats.Draws);
+        $('#totalLosses').text(playerStats.Losses);
+        $('#totalPoints').text(playerStats.TotalPoints);
+        $('#totalGoals').text(playerStats.Goals);
+        $('#totalAssists').text(playerStats.Assists);
+        $('#totalOwnGoals').text(playerStats.OwnGoals);
+        $('#totalPenalties').text(playerStats.Penalties);
         
-        // Show the stats section
-        $('#playerStats').show();
+        // Calculate goal contributions
+        const goalContributions = playerStats.Goals + playerStats.Assists;
+        $('#goalContributions').text(goalContributions);
+        
+        // Win percentage
+        $('#winPercent').text(playerStats.WinPercent + '%');
+        $('#winPercentBar').css('width', playerStats.WinPercent + '%');
         
         // Enable share button
         $('#shareButton').prop('disabled', false);
@@ -455,14 +318,13 @@ class SidewindersStats {
     }
     
     showPartnershipAnalysis(selectedPlayer) {
-        console.log('Calculating partnerships for:', selectedPlayer);
         const analysisData = [];
         
         this.players.forEach(otherPlayer => {
             if (otherPlayer === selectedPlayer) return;
             
-            const selectedGames = this.gameLog.filter(game => game['Player'] === selectedPlayer);
-            const otherGames = this.gameLog.filter(game => game['Player'] === otherPlayer);
+            const selectedGames = this.gameLog.filter(g => g['Player'] === selectedPlayer);
+            const otherGames = this.gameLog.filter(g => g['Player'] === otherPlayer);
             
             let gamesInCommon = 0;
             let sameTeamGames = 0;
@@ -470,176 +332,93 @@ class SidewindersStats {
             let oppositeTeamGames = 0;
             let selectedWinsVsOther = 0;
             
-            // Create maps for quick lookup
-            const selectedGameMap = {};
-            selectedGames.forEach(game => {
-                const key = game['ID'] + '|' + game['Team'];
-                selectedGameMap[key] = game;
-            });
-            
-            const otherGameMap = {};
-            otherGames.forEach(game => {
-                const key = game['ID'] + '|' + game['Team'];
-                otherGameMap[key] = game;
-            });
-            
-            // Find same team games
-            Object.keys(selectedGameMap).forEach(key => {
-                if (otherGameMap[key]) {
-                    gamesInCommon++;
-                    sameTeamGames++;
-                    
-                    if (selectedGameMap[key]['Result'] === 'Win') {
-                        winTogether++;
-                    }
-                }
-            });
-            
-            // Find opposite team games
+            // Find games together
             selectedGames.forEach(sGame => {
                 otherGames.forEach(oGame => {
-                    if (sGame['ID'] === oGame['ID'] && sGame['Team'] !== oGame['Team']) {
+                    if (sGame['ID'] === oGame['ID']) {
                         gamesInCommon++;
-                        oppositeTeamGames++;
                         
-                        if (sGame['Result'] === 'Win') {
-                            selectedWinsVsOther++;
+                        if (sGame['Team'] === oGame['Team']) {
+                            sameTeamGames++;
+                            if (sGame['Result'] === 'Win') winTogether++;
+                        } else {
+                            oppositeTeamGames++;
+                            if (sGame['Result'] === 'Win') selectedWinsVsOther++;
                         }
                     }
                 });
             });
             
             if (gamesInCommon > 0) {
-                const winPercentTogether = sameTeamGames > 0 ? 
-                    Math.round((winTogether / sameTeamGames) * 100) : 0;
-                
-                const h2hWinPercent = oppositeTeamGames > 0 ? 
-                    Math.round((selectedWinsVsOther / oppositeTeamGames) * 100) : 0;
-                
                 analysisData.push({
                     player: otherPlayer,
                     gamesInCommon: gamesInCommon,
                     sameTeam: sameTeamGames,
                     oppositeTeam: oppositeTeamGames,
-                    winTogether: winTogether,
-                    winPercentTogether: winPercentTogether,
-                    h2hWinPercent: h2hWinPercent
+                    winPercentTogether: sameTeamGames > 0 ? 
+                        Math.round((winTogether / sameTeamGames) * 100) : 0,
+                    h2hWinPercent: oppositeTeamGames > 0 ? 
+                        Math.round((selectedWinsVsOther / oppositeTeamGames) * 100) : 0
                 });
             }
         });
         
-        // Sort by games in common (descending)
-        analysisData.sort((a, b) => {
-            if (b.gamesInCommon !== a.gamesInCommon) {
-                return b.gamesInCommon - a.gamesInCommon;
-            }
-            return b.winPercentTogether - a.winPercentTogether;
-        });
+        // Sort by games in common
+        analysisData.sort((a, b) => b.gamesInCommon - a.gamesInCommon);
         
-        // Update partnership table
-        const tableBody = $('#partnershipTable tbody');
-        tableBody.empty();
+        // Update table
+        const tbody = $('#partnershipTable tbody');
+        tbody.empty();
         
         if (analysisData.length === 0) {
-            tableBody.append(`
-                <tr>
-                    <td colspan="6" class="text-center text-muted">
-                        No partnership data available for this player
-                    </td>
-                </tr>
-            `);
+            tbody.append('<tr><td colspan="6" class="text-center text-muted">No partnership data</td></tr>');
             return;
         }
         
         analysisData.forEach(data => {
-            const winTogetherClass = data.winPercentTogether >= 60 ? 'table-success-light' :
-                                   data.winPercentTogether <= 30 ? 'table-danger-light' : '';
+            const row = $('<tr>');
             
-            const h2hClass = data.h2hWinPercent >= 60 ? 'table-success-light' :
-                           data.h2hWinPercent <= 30 && data.oppositeTeam > 0 ? 'table-danger-light' : '';
+            // Player name (clickable)
+            const playerCell = $('<td>').addClass('fw-bold clickable-player').text(data.player);
+            playerCell.click(() => this.selectPlayer(data.player));
+            row.append(playerCell);
             
-            const row = `
-                <tr>
-                    <td class="fw-bold clickable-player" onclick="window.sidewindersApp.selectPlayer('${data.player.replace(/'/g, "\\'")}')">
-                        ${data.player}
-                    </td>
-                    <td class="text-center">${data.gamesInCommon}</td>
-                    <td class="text-center">${data.sameTeam}</td>
-                    <td class="text-center">${data.oppositeTeam > 0 ? data.oppositeTeam : '-'}</td>
-                    <td class="text-center ${winTogetherClass}">
-                        ${data.sameTeam > 0 ? data.winPercentTogether + '%' : '-'}
-                    </td>
-                    <td class="text-center ${h2hClass}">
-                        ${data.oppositeTeam > 0 ? data.h2hWinPercent + '%' : '-'}
-                    </td>
-                </tr>
-            `;
-            tableBody.append(row);
+            // Stats
+            [
+                data.gamesInCommon,
+                data.sameTeam,
+                data.oppositeTeam > 0 ? data.oppositeTeam : '-',
+                data.sameTeam > 0 ? data.winPercentTogether + '%' : '-',
+                data.oppositeTeam > 0 ? data.h2hWinPercent + '%' : '-'
+            ].forEach((value, index) => {
+                const td = $('<td>').addClass('text-center').text(value);
+                if (index === 3 && data.winPercentTogether >= 60) td.addClass('table-success-light');
+                if (index === 4 && data.h2hWinPercent >= 60) td.addClass('table-success-light');
+                row.append(td);
+            });
+            
+            tbody.append(row);
         });
-        
-        console.log('Partnership analysis complete:', analysisData.length, 'teammates');
     }
     
     updateLastUpdated() {
-        // Use cache busting for mobile
-        fetch('GameLog.csv?t=' + Date.now(), { method: 'HEAD' })
-            .then(response => {
-                const lastModified = response.headers.get('last-modified');
-                if (lastModified) {
-                    const date = new Date(lastModified);
-                    $('#lastUpdated').text(date.toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    }));
-                } else {
-                    const now = new Date();
-                    $('#lastUpdated').text(now.toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                    }));
-                }
-            })
-            .catch(() => {
-                const now = new Date();
-                $('#lastUpdated').text(now.toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                }));
-            });
-    }
-    
-    showLoading(show) {
-        if (show) {
-            $('#loadingIndicator').show();
-            $('.stat-card').addClass('opacity-50');
-        } else {
-            $('#loadingIndicator').hide();
-            $('.stat-card').removeClass('opacity-50');
-        }
-    }
-    
-    showError(message) {
-        const errorHtml = `
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <strong>Error:</strong> ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        `;
-        $('.container').prepend(errorHtml);
+        const now = new Date();
+        const formatted = now.toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        $('#lastUpdated').text(formatted);
     }
 }
 
-// Initialize the application when page loads
+// Initialize app when page loads
 $(document).ready(function() {
-    console.log('Document ready, starting app...');
     window.sidewindersApp = new SidewindersStats();
     
-    // Navigation smooth scrolling
+    // Navigation
     $('a[href="#league"]').click(function(e) {
         e.preventDefault();
         $('html, body').animate({
@@ -653,61 +432,21 @@ $(document).ready(function() {
             scrollTop: $('#analysis').offset().top - 20
         }, 500);
     });
-    
-    // Add mobile-friendly touch events
-    if ('ontouchstart' in window) {
-        $('.clickable-player').css('cursor', 'pointer');
-    }
 });
 
-// Helper function to share player analysis
+// Share function
 function shareCurrentPlayer() {
-    const playerSelect = document.getElementById('playerSelect');
-    const playerName = playerSelect.value;
-    
-    if (!playerName) {
-        alert('Please select a player first.');
-        return;
-    }
+    const playerName = $('#playerSelect').val();
+    if (!playerName) return;
     
     const url = new URL(window.location.href);
     url.hash = `player-${encodeURIComponent(playerName)}`;
     
     navigator.clipboard.writeText(url.toString())
         .then(() => {
-            // Show toast notification
-            const toast = `<div class="toast show position-fixed bottom-0 end-0 m-3" style="z-index: 9999">
-                <div class="toast-header bg-success text-white">
-                    <strong class="me-auto"><i class="fas fa-check-circle me-1"></i> Success</strong>
-                    <button type="button" class="btn-close btn-close-white" onclick="this.parentElement.parentElement.remove()"></button>
-                </div>
-                <div class="toast-body">
-                    Link to ${playerName}'s analysis copied to clipboard!
-                </div>
-            </div>`;
-            
-            // Remove any existing toasts
-            $('.toast').remove();
-            $('body').append(toast);
-            
-            // Auto-remove after 3 seconds
-            setTimeout(() => {
-                $('.toast').remove();
-            }, 3000);
+            alert(`Link to ${playerName}'s analysis copied to clipboard!`);
         })
-        .catch(err => {
-            console.error('Failed to copy:', err);
-            alert('Failed to copy link. You can manually copy the URL from your browser.');
+        .catch(() => {
+            prompt('Copy this URL:', url.toString());
         });
-}
-
-// Debug function to check if everything loaded
-function debugApp() {
-    console.log('=== DEBUG INFO ===');
-    console.log('GameLog records:', window.sidewindersApp?.gameLog?.length || 0);
-    console.log('League table:', window.sidewindersApp?.leagueTable?.length || 0);
-    console.log('Players:', window.sidewindersApp?.players?.length || 0);
-    console.log('Selected player:', window.sidewindersApp?.selectedPlayer);
-    console.log('Is loading:', window.sidewindersApp?.isLoading);
-    console.log('==================');
 }
