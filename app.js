@@ -1,8 +1,8 @@
-// Sidewinders Stats - Updated for your exact CSV formats
+// Sidewinders Stats - Calculates League Table from GameLog.csv
 class SidewindersStats {
     constructor() {
         this.gameLog = [];
-        this.leagueTable = [];
+        this.leagueTable = []; // Calculated from game log
         this.players = [];
         this.selectedPlayer = null;
         
@@ -15,6 +15,7 @@ class SidewindersStats {
         try {
             this.showLoading(true);
             await this.loadAllData();
+            this.calculateLeagueTable();
             this.initLeagueTable();
             this.initPlayerSelector();
             this.updateLastUpdated();
@@ -22,42 +23,93 @@ class SidewindersStats {
             
         } catch (error) {
             console.error('Initialization error:', error);
-            this.showError('Failed to load data. Please check your CSV files.');
+            this.showError('Failed to load data. Please check GameLog.csv file.');
             this.showLoading(false);
         }
     }
     
     async loadAllData() {
         try {
-            // Load GameLog.csv with your format
+            // Load GameLog.csv only
             const gameLogCSV = await this.fetchCSV('GameLog.csv');
             this.gameLog = this.parseCSV(gameLogCSV);
             
-            // Load LeagueTable.csv with your format
-            const leagueTableCSV = await this.fetchCSV('LeagueTable.csv');
-            this.leagueTable = this.parseCSV(leagueTableCSV);
-            
-            // Extract unique players from game log
+            // Extract unique players
             this.players = [...new Set(this.gameLog.map(row => row['Player']))]
                 .filter(name => name && name.trim() !== '')
                 .sort();
             
             console.log(`Loaded ${this.gameLog.length} game records`);
-            console.log(`Loaded ${this.leagueTable.length} league table entries`);
-            
-            // Debug: Show column names
-            if (this.gameLog.length > 0) {
-                console.log('GameLog columns:', Object.keys(this.gameLog[0]));
-            }
-            if (this.leagueTable.length > 0) {
-                console.log('LeagueTable columns:', Object.keys(this.leagueTable[0]));
-                console.log('Sample league row:', this.leagueTable[0]);
-            }
+            console.log(`Found ${this.players.length} unique players`);
             
         } catch (error) {
-            console.error('Error loading CSV files:', error);
+            console.error('Error loading CSV file:', error);
             throw error;
         }
+    }
+    
+    calculateLeagueTable() {
+        console.log('Calculating league table from game log...');
+        
+        // Initialize stats for each player
+        const playerStats = {};
+        
+        // Initialize all players
+        this.players.forEach(player => {
+            playerStats[player] = {
+                Player: player,
+                Games: 0,
+                Wins: 0,
+                Draws: 0,
+                Losses: 0,
+                Goals: 0,
+                OwnGoals: 0,
+                Assists: 0,
+                Penalties: 0,
+                Points: 0
+            };
+        });
+        
+        // Process each game record
+        this.gameLog.forEach(game => {
+            const player = game['Player'];
+            if (!player || !playerStats[player]) return;
+            
+            const stats = playerStats[player];
+            
+            // Count games
+            stats.Games++;
+            
+            // Count results and calculate points
+            const result = game['Result'];
+            if (result === 'Win') {
+                stats.Wins++;
+                stats.Points += 3; // 3 points for win
+            } else if (result === 'Draw') {
+                stats.Draws++;
+                stats.Points += 1; // 1 point for draw
+            } else if (result === 'Loss') {
+                stats.Losses++;
+                // 0 points for loss
+            }
+            
+            // Count stats (convert to numbers)
+            stats.Goals += parseInt(game['Gls']) || 0;
+            stats.OwnGoals += parseInt(game['OG']) || 0;
+            stats.Assists += parseInt(game['Ast']) || 0;
+            stats.Penalties += parseInt(game['Pen']) || 0;
+        });
+        
+        // Convert to array and sort by Points (descending), then Goals, then Assists
+        this.leagueTable = Object.values(playerStats)
+            .sort((a, b) => {
+                if (b.Points !== a.Points) return b.Points - a.Points;
+                if (b.Goals !== a.Goals) return b.Goals - a.Goals;
+                if (b.Assists !== a.Assists) return b.Assists - a.Assists;
+                return a.Player.localeCompare(b.Player);
+            });
+        
+        console.log('League table calculated:', this.leagueTable.length, 'players');
     }
     
     async fetchCSV(filename) {
@@ -99,18 +151,8 @@ class SidewindersStats {
                     value = value.replace(/^"(.*)"$/, '$1').trim();
                     
                     // Convert numeric columns
-                    const numericColumns = [
-                        'Gls', 'OG', 'Ast', 'Pen',  // GameLog
-                        'P', 'W', 'D', 'L', 'Gls', 'OG', 'Ast', 'Pts',  // LeagueTable
-                        'Appearances', 'Wins', 'Draws', 'Losses', 'Goals', 'Assists' // Legacy
-                    ];
-                    
-                    // Special handling for Column 1-18 (might be empty or numeric)
-                    const isColumnNumber = header.startsWith('Column ');
-                    const columnNum = parseInt(header.replace('Column ', ''));
-                    
-                    if ((numericColumns.includes(header) || isColumnNumber) && 
-                        !isNaN(value) && value !== '') {
+                    const numericColumns = ['Gls', 'OG', 'Ast', 'Pen'];
+                    if (numericColumns.includes(header) && !isNaN(value) && value !== '') {
                         value = Number(value);
                     }
                     
@@ -157,7 +199,7 @@ class SidewindersStats {
     
     initLeagueTable() {
         if (this.leagueTable.length === 0) {
-            $('#leagueTable').html('<tr><td colspan="9" class="text-center">No league data available</td></tr>');
+            $('#leagueTable').html('<tr><td colspan="10" class="text-center">No game data available</td></tr>');
             return;
         }
         
@@ -165,46 +207,9 @@ class SidewindersStats {
             $('#leagueTable').DataTable().destroy();
         }
         
-        // Create a transformed dataset with calculated fields
-        const transformedData = this.leagueTable.map(row => {
-            // Calculate Win Rate % from W, D, L
-            const games = parseInt(row['P']) || 0;
-            const wins = parseInt(row['W']) || 0;
-            const draws = parseInt(row['D']) || 0;
-            const losses = parseInt(row['L']) || 0;
-            
-            // Calculate Win Rate %
-            let winRate = 0;
-            if (games > 0) {
-                winRate = Math.round((wins / games) * 100 * 10) / 10; // 1 decimal place
-            }
-            
-            // Calculate Points Per Game (PPG)
-            let ppg = 0;
-            const points = parseInt(row['Pts']) || 0;
-            if (games > 0) {
-                ppg = Math.round((points / games) * 10) / 10; // 1 decimal place
-            }
-            
-            // Create a clean object for DataTables
-            return {
-                Player: row['Player'],
-                Games: games,
-                Wins: wins,
-                Draws: draws,
-                Losses: losses,
-                Goals: parseInt(row['Gls']) || 0,
-                Assists: parseInt(row['Ast']) || 0,
-                OwnGoals: parseInt(row['OG']) || 0,
-                Points: points,
-                WinRate: winRate,
-                PPG: ppg
-            };
-        });
-        
-        // Initialize DataTable with YOUR league columns
+        // Initialize DataTable with calculated league table
         const table = $('#leagueTable').DataTable({
-            data: transformedData,
+            data: this.leagueTable,
             columns: [
                 { 
                     data: 'Player',
@@ -216,61 +221,56 @@ class SidewindersStats {
                 { 
                     data: 'Games',
                     className: 'text-center',
-                    title: 'P'
+                    title: 'Games'
                 },
                 { 
                     data: 'Wins',
                     className: 'text-center',
-                    title: 'W'
+                    title: 'Wins'
                 },
                 { 
                     data: 'Draws',
                     className: 'text-center',
-                    title: 'D'
+                    title: 'Draws'
                 },
                 { 
                     data: 'Losses',
                     className: 'text-center',
-                    title: 'L'
+                    title: 'Losses'
                 },
                 { 
                     data: 'Goals',
                     className: 'text-center fw-bold text-primary',
-                    title: 'Gls'
+                    title: 'Goals'
+                },
+                { 
+                    data: 'OwnGoals',
+                    className: 'text-center',
+                    title: 'Own Goals'
                 },
                 { 
                     data: 'Assists',
                     className: 'text-center',
-                    title: 'Ast'
+                    title: 'Assists'
                 },
                 { 
-                    data: 'WinRate',
+                    data: 'Penalties',
                     className: 'text-center',
-                    title: 'Win %',
-                    render: function(data, type, row) {
-                        if (type === 'sort' || type === 'type') {
-                            return data;
-                        }
-                        let color = '#dc3545'; // red
-                        if (data >= 60) color = '#198754'; // green
-                        else if (data >= 40) color = '#fd7e14'; // orange
-                        
-                        return `<span style="color: ${color}; font-weight: bold">${data}%</span>`;
-                    }
+                    title: 'Penalties'
                 },
                 { 
-                    data: 'PPG',
-                    className: 'text-center fw-bold',
-                    title: 'PPG',
+                    data: 'Points',
+                    className: 'text-center fw-bold text-success',
+                    title: 'Points',
                     render: function(data, type, row) {
                         if (type === 'sort' || type === 'type') {
                             return data;
                         }
-                        return data.toFixed(1);
+                        return `<strong>${data}</strong>`;
                     }
                 }
             ],
-            order: [[7, 'desc']], // Sort by Win Rate % descending
+            order: [[9, 'desc']], // Default sort by Points (column 9) descending
             pageLength: 25,
             responsive: true,
             language: {
@@ -297,12 +297,7 @@ class SidewindersStats {
         select.empty();
         select.append('<option value="">Choose a player...</option>');
         
-        // Use players from both GameLog and LeagueTable for completeness
-        const allPlayers = [...new Set([...this.players, ...this.leagueTable.map(row => row['Player'])])]
-            .filter(name => name && name.trim() !== '')
-            .sort();
-        
-        allPlayers.forEach(player => {
+        this.players.forEach(player => {
             select.append(`<option value="${player}">${player}</option>`);
         });
         
@@ -324,61 +319,25 @@ class SidewindersStats {
         // Update player name display
         $('#playerName').text(playerName);
         
-        // Get league data for this player
-        const leagueData = this.leagueTable.find(row => row['Player'] === playerName);
+        // Get player's league stats
+        const playerStats = this.leagueTable.find(row => row.Player === playerName);
         
-        if (leagueData) {
-            // Display league stats
-            const games = parseInt(leagueData['P']) || 0;
-            const wins = parseInt(leagueData['W']) || 0;
-            const draws = parseInt(leagueData['D']) || 0;
-            const losses = parseInt(leagueData['L']) || 0;
-            const goals = parseInt(leagueData['Gls']) || 0;
-            const assists = parseInt(leagueData['Ast']) || 0;
-            const ownGoals = parseInt(leagueData['OG']) || 0;
-            const points = parseInt(leagueData['Pts']) || 0;
-            
-            const winPercent = games > 0 ? Math.round((wins / games) * 100) : 0;
-            const pointsPerGame = games > 0 ? Math.round((points / games) * 10) / 10 : 0;
-            
+        if (playerStats) {
             // Update basic stats cards
-            $('#totalGames').text(games);
-            $('#totalWins').text(wins);
-            $('#totalDraws').text(draws);
-            $('#totalLosses').text(losses);
+            $('#totalGames').text(playerStats.Games);
+            $('#totalWins').text(playerStats.Wins);
+            $('#totalDraws').text(playerStats.Draws);
+            $('#totalLosses').text(playerStats.Losses);
+            $('#totalPoints').text(playerStats.Points);
+            $('#totalGoals').text(playerStats.Goals);
+            $('#totalAssists').text(playerStats.Assists);
+            $('#totalOwnGoals').text(playerStats.OwnGoals);
+            $('#totalPenalties').text(playerStats.Penalties);
+            
+            // Calculate win percentage for display only
+            const winPercent = playerStats.Games > 0 ? 
+                Math.round((playerStats.Wins / playerStats.Games) * 100) : 0;
             $('#winPercent').text(winPercent + '%');
-            $('#pointsPerGame').text(pointsPerGame.toFixed(1));
-            $('#totalGoals').text(goals);
-            $('#totalAssists').text(assists);
-            $('#totalOwnGoals').text(ownGoals);
-            
-            // Update win percentage progress bar
-            $('#winPercentBar').css('width', winPercent + '%');
-        } else {
-            // Fallback to calculating from GameLog
-            const playerGames = this.gameLog.filter(game => game['Player'] === playerName);
-            
-            const totalGames = playerGames.length;
-            const wins = playerGames.filter(game => game['Result'] === 'Win').length;
-            const draws = playerGames.filter(game => game['Result'] === 'Draw').length;
-            const losses = playerGames.filter(game => game['Result'] === 'Loss').length;
-            const goals = playerGames.reduce((sum, game) => sum + (parseInt(game['Gls']) || 0), 0);
-            const assists = playerGames.reduce((sum, game) => sum + (parseInt(game['Ast']) || 0), 0);
-            const ownGoals = playerGames.reduce((sum, game) => sum + (parseInt(game['OG']) || 0), 0);
-            
-            const winPercent = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
-            const points = (wins * 3) + draws;
-            const pointsPerGame = totalGames > 0 ? Math.round((points / totalGames) * 10) / 10 : 0;
-            
-            $('#totalGames').text(totalGames);
-            $('#totalWins').text(wins);
-            $('#totalDraws').text(draws);
-            $('#totalLosses').text(losses);
-            $('#winPercent').text(winPercent + '%');
-            $('#pointsPerGame').text(pointsPerGame.toFixed(1));
-            $('#totalGoals').text(goals);
-            $('#totalAssists').text(assists);
-            $('#totalOwnGoals').text(ownGoals);
             $('#winPercentBar').css('width', winPercent + '%');
         }
         
@@ -601,7 +560,6 @@ function shareCurrentPlayer() {
     
     navigator.clipboard.writeText(url.toString())
         .then(() => {
-            // Show success toast
             const toast = `<div class="toast show position-fixed bottom-0 end-0 m-3" role="alert">
                 <div class="toast-header bg-success text-white">
                     <strong class="me-auto">Success!</strong>
