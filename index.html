@@ -131,9 +131,11 @@
         .points-badge {
             background: linear-gradient(90deg, var(--success-color), #34d399);
             color: white;
-            padding: 3px 10px;
+            padding: 4px 12px;
             border-radius: 20px;
             font-weight: 600;
+            display: inline-block;
+            min-width: 40px;
         }
         
         .goals-badge {
@@ -286,7 +288,7 @@
                                 <th class="text-center">Own Goals</th>
                                 <th class="text-center">Assists</th>
                                 <th class="text-center">Penalties</th>
-                                <th class="text-center">Points</th>
+                                <th class="text-center">Total Points</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -405,9 +407,10 @@
                         <div class="card border-secondary-left">
                             <div class="card-body text-center">
                                 <h6 class="card-subtitle mb-2 text-muted">
-                                    <i class="fas fa-flag"></i> Penalties
+                                    <i class="fas fa-chart-bar"></i> Goal + Assist
                                 </h6>
-                                <h2 id="totalPenalties" class="card-title text-secondary">0</h2>
+                                <h2 id="goalContributions" class="card-title text-secondary">0</h2>
+                                <small class="text-muted">(Goals + Assists)</small>
                             </div>
                         </div>
                     </div>
