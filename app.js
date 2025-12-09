@@ -1,8 +1,8 @@
-// Sidewinders Stats - Calculates League Table from GameLog.csv
+// Sidewinders Stats - Updated with fixes
 class SidewindersStats {
     constructor() {
         this.gameLog = [];
-        this.leagueTable = []; // Calculated from game log
+        this.leagueTable = [];
         this.players = [];
         this.selectedPlayer = null;
         
@@ -30,11 +30,9 @@ class SidewindersStats {
     
     async loadAllData() {
         try {
-            // Load GameLog.csv only
             const gameLogCSV = await this.fetchCSV('GameLog.csv');
             this.gameLog = this.parseCSV(gameLogCSV);
             
-            // Extract unique players
             this.players = [...new Set(this.gameLog.map(row => row['Player']))]
                 .filter(name => name && name.trim() !== '')
                 .sort();
@@ -51,10 +49,8 @@ class SidewindersStats {
     calculateLeagueTable() {
         console.log('Calculating league table from game log...');
         
-        // Initialize stats for each player
         const playerStats = {};
         
-        // Initialize all players
         this.players.forEach(player => {
             playerStats[player] = {
                 Player: player,
@@ -66,44 +62,38 @@ class SidewindersStats {
                 OwnGoals: 0,
                 Assists: 0,
                 Penalties: 0,
-                Points: 0
+                TotalPoints: 0
             };
         });
         
-        // Process each game record
         this.gameLog.forEach(game => {
             const player = game['Player'];
             if (!player || !playerStats[player]) return;
             
             const stats = playerStats[player];
             
-            // Count games
             stats.Games++;
             
-            // Count results and calculate points
             const result = game['Result'];
             if (result === 'Win') {
                 stats.Wins++;
-                stats.Points += 3; // 3 points for win
+                stats.TotalPoints += 3;
             } else if (result === 'Draw') {
                 stats.Draws++;
-                stats.Points += 1; // 1 point for draw
+                stats.TotalPoints += 1;
             } else if (result === 'Loss') {
                 stats.Losses++;
-                // 0 points for loss
             }
             
-            // Count stats (convert to numbers)
             stats.Goals += parseInt(game['Gls']) || 0;
             stats.OwnGoals += parseInt(game['OG']) || 0;
             stats.Assists += parseInt(game['Ast']) || 0;
             stats.Penalties += parseInt(game['Pen']) || 0;
         });
         
-        // Convert to array and sort by Points (descending), then Goals, then Assists
         this.leagueTable = Object.values(playerStats)
             .sort((a, b) => {
-                if (b.Points !== a.Points) return b.Points - a.Points;
+                if (b.TotalPoints !== a.TotalPoints) return b.TotalPoints - a.TotalPoints;
                 if (b.Goals !== a.Goals) return b.Goals - a.Goals;
                 if (b.Assists !== a.Assists) return b.Assists - a.Assists;
                 return a.Player.localeCompare(b.Player);
@@ -133,12 +123,10 @@ class SidewindersStats {
         const lines = csvText.split('\n').filter(line => line.trim() !== '');
         if (lines.length < 2) return [];
         
-        // Parse headers
         const headers = this.parseCSVLine(lines[0]).map(h => 
             h.replace(/^"(.*)"$/, '$1').trim()
         );
         
-        // Parse data rows
         const data = [];
         for (let i = 1; i < lines.length; i++) {
             const values = this.parseCSVLine(lines[i]);
@@ -150,7 +138,6 @@ class SidewindersStats {
                     let value = values[index];
                     value = value.replace(/^"(.*)"$/, '$1').trim();
                     
-                    // Convert numeric columns
                     const numericColumns = ['Gls', 'OG', 'Ast', 'Pen'];
                     if (numericColumns.includes(header) && !isNaN(value) && value !== '') {
                         value = Number(value);
@@ -160,7 +147,6 @@ class SidewindersStats {
                 }
             });
             
-            // Only add row if it has data
             if (Object.keys(row).length > 0 && row[headers[0]]) {
                 data.push(row);
             }
@@ -207,7 +193,6 @@ class SidewindersStats {
             $('#leagueTable').DataTable().destroy();
         }
         
-        // Initialize DataTable with calculated league table
         const table = $('#leagueTable').DataTable({
             data: this.leagueTable,
             columns: [
@@ -259,18 +244,18 @@ class SidewindersStats {
                     title: 'Penalties'
                 },
                 { 
-                    data: 'Points',
+                    data: 'TotalPoints',
                     className: 'text-center fw-bold text-success',
-                    title: 'Points',
+                    title: 'Total Points',
                     render: function(data, type, row) {
                         if (type === 'sort' || type === 'type') {
                             return data;
                         }
-                        return `<strong>${data}</strong>`;
+                        return `<strong class="points-badge">${data}</strong>`;
                     }
                 }
             ],
-            order: [[9, 'desc']], // Default sort by Points (column 9) descending
+            order: [[9, 'desc']], // Default sort by Total Points (column 9) descending
             pageLength: 25,
             responsive: true,
             language: {
@@ -280,7 +265,6 @@ class SidewindersStats {
             }
         });
         
-        // Click handler for player names
         $('#leagueTable tbody').on('click', 'td:first-child', (event) => {
             const playerName = $(event.target).text().trim();
             if (playerName && this.players.includes(playerName)) {
@@ -316,38 +300,34 @@ class SidewindersStats {
     }
     
     showPlayerAnalysis(playerName) {
-        // Update player name display
         $('#playerName').text(playerName);
         
-        // Get player's league stats
         const playerStats = this.leagueTable.find(row => row.Player === playerName);
         
         if (playerStats) {
-            // Update basic stats cards
             $('#totalGames').text(playerStats.Games);
             $('#totalWins').text(playerStats.Wins);
             $('#totalDraws').text(playerStats.Draws);
             $('#totalLosses').text(playerStats.Losses);
-            $('#totalPoints').text(playerStats.Points);
+            $('#totalPoints').text(playerStats.TotalPoints);
             $('#totalGoals').text(playerStats.Goals);
             $('#totalAssists').text(playerStats.Assists);
             $('#totalOwnGoals').text(playerStats.OwnGoals);
             $('#totalPenalties').text(playerStats.Penalties);
             
-            // Calculate win percentage for display only
+            // Calculate Goal Contributions (Goals + Assists, excluding Own Goals)
+            const goalContributions = playerStats.Goals + playerStats.Assists;
+            $('#goalContributions').text(goalContributions);
+            
+            // Calculate win percentage
             const winPercent = playerStats.Games > 0 ? 
                 Math.round((playerStats.Wins / playerStats.Games) * 100) : 0;
             $('#winPercent').text(winPercent + '%');
             $('#winPercentBar').css('width', winPercent + '%');
         }
         
-        // Show the stats section
         $('#playerStats').show();
-        
-        // Enable share button
         $('#shareButton').prop('disabled', false);
-        
-        // Calculate and show partnership analysis
         this.showPartnershipAnalysis(playerName);
     }
     
@@ -366,7 +346,6 @@ class SidewindersStats {
             let oppositeTeamGames = 0;
             let selectedWinsVsOther = 0;
             
-            // Create maps for quick lookup
             const selectedGameMap = {};
             selectedGames.forEach(game => {
                 const key = game['ID'] + '|' + game['Team'];
@@ -379,7 +358,6 @@ class SidewindersStats {
                 otherGameMap[key] = game;
             });
             
-            // Find same team games
             Object.keys(selectedGameMap).forEach(key => {
                 if (otherGameMap[key]) {
                     gamesInCommon++;
@@ -391,7 +369,6 @@ class SidewindersStats {
                 }
             });
             
-            // Find opposite team games
             selectedGames.forEach(sGame => {
                 otherGames.forEach(oGame => {
                     if (sGame['ID'] === oGame['ID'] && sGame['Team'] !== oGame['Team']) {
@@ -424,7 +401,6 @@ class SidewindersStats {
             }
         });
         
-        // Sort by games in common (descending)
         analysisData.sort((a, b) => {
             if (b.gamesInCommon !== a.gamesInCommon) {
                 return b.gamesInCommon - a.gamesInCommon;
@@ -432,7 +408,6 @@ class SidewindersStats {
             return b.winPercentTogether - a.winPercentTogether;
         });
         
-        // Update partnership table
         const tableBody = $('#partnershipTable tbody');
         tableBody.empty();
         
@@ -529,7 +504,6 @@ class SidewindersStats {
 document.addEventListener('DOMContentLoaded', function() {
     window.sidewindersApp = new SidewindersStats();
     
-    // Navigation
     $('a[href="#league"]').click(function(e) {
         e.preventDefault();
         $('html, body').animate({
@@ -545,7 +519,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Helper functions
 function shareCurrentPlayer() {
     const playerSelect = document.getElementById('playerSelect');
     const playerName = playerSelect.value;
