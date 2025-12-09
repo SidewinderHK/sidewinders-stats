@@ -1,6 +1,4 @@
-// Sidewinders Stats - Complete Application
-// Loads data from CSV files and provides interactive stats
-
+// Sidewinders Stats - Updated for your exact CSV formats
 class SidewindersStats {
     constructor() {
         this.gameLog = [];
@@ -8,7 +6,6 @@ class SidewindersStats {
         this.players = [];
         this.selectedPlayer = null;
         
-        // Initialize when DOM is ready
         $(document).ready(() => {
             this.init();
         });
@@ -16,22 +13,12 @@ class SidewindersStats {
     
     async init() {
         try {
-            // Show loading state
             this.showLoading(true);
-            
-            // Load all data
             await this.loadAllData();
-            
-            // Initialize components
             this.initLeagueTable();
             this.initPlayerSelector();
             this.updateLastUpdated();
-            
-            // Hide loading state
             this.showLoading(false);
-            
-            // Show success message
-            console.log('Sidewinders Stats loaded successfully!');
             
         } catch (error) {
             console.error('Initialization error:', error);
@@ -42,42 +29,34 @@ class SidewindersStats {
     
     async loadAllData() {
         try {
-            // Load GameLog.csv
+            // Load GameLog.csv with your format
             const gameLogCSV = await this.fetchCSV('GameLog.csv');
             this.gameLog = this.parseCSV(gameLogCSV);
             
-            // Load LeagueTable.csv
+            // Load LeagueTable.csv with your format
             const leagueTableCSV = await this.fetchCSV('LeagueTable.csv');
             this.leagueTable = this.parseCSV(leagueTableCSV);
             
             // Extract unique players from game log
-            this.players = [...new Set(this.gameLog.map(row => row['Player Name']))]
+            this.players = [...new Set(this.gameLog.map(row => row['Player']))]
                 .filter(name => name && name.trim() !== '')
                 .sort();
             
             console.log(`Loaded ${this.gameLog.length} game records`);
             console.log(`Loaded ${this.leagueTable.length} league table entries`);
-            console.log(`Found ${this.players.length} unique players`);
+            
+            // Debug: Show column names
+            if (this.gameLog.length > 0) {
+                console.log('GameLog columns:', Object.keys(this.gameLog[0]));
+            }
+            if (this.leagueTable.length > 0) {
+                console.log('LeagueTable columns:', Object.keys(this.leagueTable[0]));
+                console.log('Sample league row:', this.leagueTable[0]);
+            }
             
         } catch (error) {
             console.error('Error loading CSV files:', error);
-            
-            // Try alternative CSV file names
-            console.log('Trying alternative file names...');
-            try {
-                const altGameLog = await this.fetchCSV('gamelog.csv') || 
-                                   await this.fetchCSV('GameLog.csv') ||
-                                   await this.fetchCSV('gamelog.CSV');
-                
-                if (altGameLog) {
-                    this.gameLog = this.parseCSV(altGameLog);
-                    this.players = [...new Set(this.gameLog.map(row => row['Player Name']))]
-                        .filter(name => name && name.trim() !== '')
-                        .sort();
-                }
-            } catch (altError) {
-                throw new Error('Could not load CSV files. Please ensure GameLog.csv and LeagueTable.csv exist in the same folder.');
-            }
+            throw error;
         }
     }
     
@@ -102,7 +81,7 @@ class SidewindersStats {
         const lines = csvText.split('\n').filter(line => line.trim() !== '');
         if (lines.length < 2) return [];
         
-        // Parse headers (handle quoted headers)
+        // Parse headers
         const headers = this.parseCSVLine(lines[0]).map(h => 
             h.replace(/^"(.*)"$/, '$1').trim()
         );
@@ -117,11 +96,21 @@ class SidewindersStats {
             headers.forEach((header, index) => {
                 if (values[index] !== undefined) {
                     let value = values[index];
-                    // Remove quotes if present
                     value = value.replace(/^"(.*)"$/, '$1').trim();
                     
-                    // Convert numeric values
-                    if (!isNaN(value) && value !== '') {
+                    // Convert numeric columns
+                    const numericColumns = [
+                        'Gls', 'OG', 'Ast', 'Pen',  // GameLog
+                        'P', 'W', 'D', 'L', 'Gls', 'OG', 'Ast', 'Pts',  // LeagueTable
+                        'Appearances', 'Wins', 'Draws', 'Losses', 'Goals', 'Assists' // Legacy
+                    ];
+                    
+                    // Special handling for Column 1-18 (might be empty or numeric)
+                    const isColumnNumber = header.startsWith('Column ');
+                    const columnNum = parseInt(header.replace('Column ', ''));
+                    
+                    if ((numericColumns.includes(header) || isColumnNumber) && 
+                        !isNaN(value) && value !== '') {
                         value = Number(value);
                     }
                     
@@ -129,7 +118,7 @@ class SidewindersStats {
                 }
             });
             
-            // Only add row if it has valid data
+            // Only add row if it has data
             if (Object.keys(row).length > 0 && row[headers[0]]) {
                 data.push(row);
             }
@@ -149,9 +138,8 @@ class SidewindersStats {
             
             if (char === '"') {
                 if (insideQuotes && nextChar === '"') {
-                    // Escaped quote
                     currentValue += '"';
-                    i++; // Skip next char
+                    i++;
                 } else {
                     insideQuotes = !insideQuotes;
                 }
@@ -163,9 +151,7 @@ class SidewindersStats {
             }
         }
         
-        // Add last value
         values.push(currentValue);
-        
         return values;
     }
     
@@ -175,90 +161,130 @@ class SidewindersStats {
             return;
         }
         
-        // Destroy existing DataTable if it exists
         if ($.fn.DataTable.isDataTable('#leagueTable')) {
             $('#leagueTable').DataTable().destroy();
         }
         
-        // Initialize DataTable
+        // Create a transformed dataset with calculated fields
+        const transformedData = this.leagueTable.map(row => {
+            // Calculate Win Rate % from W, D, L
+            const games = parseInt(row['P']) || 0;
+            const wins = parseInt(row['W']) || 0;
+            const draws = parseInt(row['D']) || 0;
+            const losses = parseInt(row['L']) || 0;
+            
+            // Calculate Win Rate %
+            let winRate = 0;
+            if (games > 0) {
+                winRate = Math.round((wins / games) * 100 * 10) / 10; // 1 decimal place
+            }
+            
+            // Calculate Points Per Game (PPG)
+            let ppg = 0;
+            const points = parseInt(row['Pts']) || 0;
+            if (games > 0) {
+                ppg = Math.round((points / games) * 10) / 10; // 1 decimal place
+            }
+            
+            // Create a clean object for DataTables
+            return {
+                Player: row['Player'],
+                Games: games,
+                Wins: wins,
+                Draws: draws,
+                Losses: losses,
+                Goals: parseInt(row['Gls']) || 0,
+                Assists: parseInt(row['Ast']) || 0,
+                OwnGoals: parseInt(row['OG']) || 0,
+                Points: points,
+                WinRate: winRate,
+                PPG: ppg
+            };
+        });
+        
+        // Initialize DataTable with YOUR league columns
         const table = $('#leagueTable').DataTable({
-            data: this.leagueTable,
+            data: transformedData,
             columns: [
                 { 
                     data: 'Player',
-                    className: 'fw-bold'
-                },
-                { 
-                    data: 'Appearances',
-                    className: 'text-center'
-                },
-                { 
-                    data: 'Wins',
-                    className: 'text-center'
-                },
-                { 
-                    data: 'Draws',
-                    className: 'text-center'
-                },
-                { 
-                    data: 'Losses',
-                    className: 'text-center'
-                },
-                { 
-                    data: 'Goals',
-                    className: 'text-center fw-bold text-primary'
-                },
-                { 
-                    data: 'Assists',
-                    className: 'text-center'
-                },
-                { 
-                    data: 'Win Rate %',
-                    className: 'text-center',
+                    className: 'fw-bold clickable-player',
                     render: function(data, type, row) {
-                        if (type === 'sort' || type === 'type') {
-                            return parseFloat(data) || 0;
-                        }
-                        const value = parseFloat(data) || 0;
-                        let color = '#dc3545'; // red
-                        if (value >= 60) color = '#198754'; // green
-                        else if (value >= 40) color = '#fd7e14'; // orange
-                        
-                        return `<span style="color: ${color}; font-weight: bold">${value}%</span>`;
+                        return `<span class="clickable-player">${data}</span>`;
                     }
                 },
                 { 
-                    data: 'Points Per Game',
-                    className: 'text-center fw-bold',
+                    data: 'Games',
+                    className: 'text-center',
+                    title: 'P'
+                },
+                { 
+                    data: 'Wins',
+                    className: 'text-center',
+                    title: 'W'
+                },
+                { 
+                    data: 'Draws',
+                    className: 'text-center',
+                    title: 'D'
+                },
+                { 
+                    data: 'Losses',
+                    className: 'text-center',
+                    title: 'L'
+                },
+                { 
+                    data: 'Goals',
+                    className: 'text-center fw-bold text-primary',
+                    title: 'Gls'
+                },
+                { 
+                    data: 'Assists',
+                    className: 'text-center',
+                    title: 'Ast'
+                },
+                { 
+                    data: 'WinRate',
+                    className: 'text-center',
+                    title: 'Win %',
                     render: function(data, type, row) {
                         if (type === 'sort' || type === 'type') {
-                            return parseFloat(data) || 0;
+                            return data;
                         }
-                        const value = parseFloat(data) || 0;
-                        return value.toFixed(1);
+                        let color = '#dc3545'; // red
+                        if (data >= 60) color = '#198754'; // green
+                        else if (data >= 40) color = '#fd7e14'; // orange
+                        
+                        return `<span style="color: ${color}; font-weight: bold">${data}%</span>`;
+                    }
+                },
+                { 
+                    data: 'PPG',
+                    className: 'text-center fw-bold',
+                    title: 'PPG',
+                    render: function(data, type, row) {
+                        if (type === 'sort' || type === 'type') {
+                            return data;
+                        }
+                        return data.toFixed(1);
                     }
                 }
             ],
             order: [[7, 'desc']], // Sort by Win Rate % descending
             pageLength: 25,
-            lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
             responsive: true,
-            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-6"i><"col-sm-12 col-md-6"p>>',
             language: {
                 search: "Search players:",
                 lengthMenu: "Show _MENU_ entries",
-                info: "Showing _START_ to _END_ of _TOTAL_ players",
-                infoEmpty: "No players available",
-                zeroRecords: "No matching players found"
+                info: "Showing _START_ to _END_ of _TOTAL_ players"
             }
         });
         
-        // Add click handler to player names
+        // Click handler for player names
         $('#leagueTable tbody').on('click', 'td:first-child', (event) => {
             const playerName = $(event.target).text().trim();
             if (playerName && this.players.includes(playerName)) {
                 this.selectPlayer(playerName);
-                // Scroll to analysis section
                 $('html, body').animate({
                     scrollTop: $('#analysis').offset().top - 20
                 }, 500);
@@ -271,11 +297,15 @@ class SidewindersStats {
         select.empty();
         select.append('<option value="">Choose a player...</option>');
         
-        this.players.forEach(player => {
+        // Use players from both GameLog and LeagueTable for completeness
+        const allPlayers = [...new Set([...this.players, ...this.leagueTable.map(row => row['Player'])])]
+            .filter(name => name && name.trim() !== '')
+            .sort();
+        
+        allPlayers.forEach(player => {
             select.append(`<option value="${player}">${player}</option>`);
         });
         
-        // Set up change handler
         select.off('change').on('change', (e) => {
             const player = e.target.value;
             if (player) {
@@ -294,36 +324,69 @@ class SidewindersStats {
         // Update player name display
         $('#playerName').text(playerName);
         
-        // Calculate basic player stats
-        const playerGames = this.gameLog.filter(game => 
-            game['Player Name'] === playerName
-        );
+        // Get league data for this player
+        const leagueData = this.leagueTable.find(row => row['Player'] === playerName);
         
-        const totalGames = playerGames.length;
-        const wins = playerGames.filter(game => game.Result === 'Win').length;
-        const draws = playerGames.filter(game => game.Result === 'Draw').length;
-        const losses = playerGames.filter(game => game.Result === 'Loss').length;
-        const goals = playerGames.reduce((sum, game) => sum + (parseInt(game.Goals) || 0), 0);
-        const assists = playerGames.reduce((sum, game) => sum + (parseInt(game.Assists) || 0), 0);
-        const ownGoals = playerGames.reduce((sum, game) => sum + (parseInt(game['Own Goals']) || 0), 0);
-        
-        const winPercent = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
-        const points = (wins * 3) + draws;
-        const pointsPerGame = totalGames > 0 ? (points / totalGames).toFixed(1) : 0;
-        
-        // Update basic stats cards
-        $('#totalGames').text(totalGames);
-        $('#totalWins').text(wins);
-        $('#totalDraws').text(draws);
-        $('#totalLosses').text(losses);
-        $('#winPercent').text(winPercent + '%');
-        $('#pointsPerGame').text(pointsPerGame);
-        $('#totalGoals').text(goals);
-        $('#totalAssists').text(assists);
-        $('#totalOwnGoals').text(ownGoals);
+        if (leagueData) {
+            // Display league stats
+            const games = parseInt(leagueData['P']) || 0;
+            const wins = parseInt(leagueData['W']) || 0;
+            const draws = parseInt(leagueData['D']) || 0;
+            const losses = parseInt(leagueData['L']) || 0;
+            const goals = parseInt(leagueData['Gls']) || 0;
+            const assists = parseInt(leagueData['Ast']) || 0;
+            const ownGoals = parseInt(leagueData['OG']) || 0;
+            const points = parseInt(leagueData['Pts']) || 0;
+            
+            const winPercent = games > 0 ? Math.round((wins / games) * 100) : 0;
+            const pointsPerGame = games > 0 ? Math.round((points / games) * 10) / 10 : 0;
+            
+            // Update basic stats cards
+            $('#totalGames').text(games);
+            $('#totalWins').text(wins);
+            $('#totalDraws').text(draws);
+            $('#totalLosses').text(losses);
+            $('#winPercent').text(winPercent + '%');
+            $('#pointsPerGame').text(pointsPerGame.toFixed(1));
+            $('#totalGoals').text(goals);
+            $('#totalAssists').text(assists);
+            $('#totalOwnGoals').text(ownGoals);
+            
+            // Update win percentage progress bar
+            $('#winPercentBar').css('width', winPercent + '%');
+        } else {
+            // Fallback to calculating from GameLog
+            const playerGames = this.gameLog.filter(game => game['Player'] === playerName);
+            
+            const totalGames = playerGames.length;
+            const wins = playerGames.filter(game => game['Result'] === 'Win').length;
+            const draws = playerGames.filter(game => game['Result'] === 'Draw').length;
+            const losses = playerGames.filter(game => game['Result'] === 'Loss').length;
+            const goals = playerGames.reduce((sum, game) => sum + (parseInt(game['Gls']) || 0), 0);
+            const assists = playerGames.reduce((sum, game) => sum + (parseInt(game['Ast']) || 0), 0);
+            const ownGoals = playerGames.reduce((sum, game) => sum + (parseInt(game['OG']) || 0), 0);
+            
+            const winPercent = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
+            const points = (wins * 3) + draws;
+            const pointsPerGame = totalGames > 0 ? Math.round((points / totalGames) * 10) / 10 : 0;
+            
+            $('#totalGames').text(totalGames);
+            $('#totalWins').text(wins);
+            $('#totalDraws').text(draws);
+            $('#totalLosses').text(losses);
+            $('#winPercent').text(winPercent + '%');
+            $('#pointsPerGame').text(pointsPerGame.toFixed(1));
+            $('#totalGoals').text(goals);
+            $('#totalAssists').text(assists);
+            $('#totalOwnGoals').text(ownGoals);
+            $('#winPercentBar').css('width', winPercent + '%');
+        }
         
         // Show the stats section
         $('#playerStats').show();
+        
+        // Enable share button
+        $('#shareButton').prop('disabled', false);
         
         // Calculate and show partnership analysis
         this.showPartnershipAnalysis(playerName);
@@ -332,20 +395,12 @@ class SidewindersStats {
     showPartnershipAnalysis(selectedPlayer) {
         const analysisData = [];
         
-        // Analyze each other player
         this.players.forEach(otherPlayer => {
             if (otherPlayer === selectedPlayer) return;
             
-            // Get games for both players
-            const selectedGames = this.gameLog.filter(game => 
-                game['Player Name'] === selectedPlayer
-            );
+            const selectedGames = this.gameLog.filter(game => game['Player'] === selectedPlayer);
+            const otherGames = this.gameLog.filter(game => game['Player'] === otherPlayer);
             
-            const otherGames = this.gameLog.filter(game => 
-                game['Player Name'] === otherPlayer
-            );
-            
-            // Find games in common
             let gamesInCommon = 0;
             let sameTeamGames = 0;
             let winTogether = 0;
@@ -355,13 +410,13 @@ class SidewindersStats {
             // Create maps for quick lookup
             const selectedGameMap = {};
             selectedGames.forEach(game => {
-                const key = game['Game ID'] + '|' + game.Team;
+                const key = game['ID'] + '|' + game['Team'];
                 selectedGameMap[key] = game;
             });
             
             const otherGameMap = {};
             otherGames.forEach(game => {
-                const key = game['Game ID'] + '|' + game.Team;
+                const key = game['ID'] + '|' + game['Team'];
                 otherGameMap[key] = game;
             });
             
@@ -371,7 +426,7 @@ class SidewindersStats {
                     gamesInCommon++;
                     sameTeamGames++;
                     
-                    if (selectedGameMap[key].Result === 'Win') {
+                    if (selectedGameMap[key]['Result'] === 'Win') {
                         winTogether++;
                     }
                 }
@@ -380,19 +435,17 @@ class SidewindersStats {
             // Find opposite team games
             selectedGames.forEach(sGame => {
                 otherGames.forEach(oGame => {
-                    if (sGame['Game ID'] === oGame['Game ID'] && 
-                        sGame.Team !== oGame.Team) {
+                    if (sGame['ID'] === oGame['ID'] && sGame['Team'] !== oGame['Team']) {
                         gamesInCommon++;
                         oppositeTeamGames++;
                         
-                        if (sGame.Result === 'Win') {
+                        if (sGame['Result'] === 'Win') {
                             selectedWinsVsOther++;
                         }
                     }
                 });
             });
             
-            // Only include players they've played with
             if (gamesInCommon > 0) {
                 const winPercentTogether = sameTeamGames > 0 ? 
                     Math.round((winTogether / sameTeamGames) * 100) : 0;
@@ -412,7 +465,7 @@ class SidewindersStats {
             }
         });
         
-        // Sort by games in common (descending), then by win percentage
+        // Sort by games in common (descending)
         analysisData.sort((a, b) => {
             if (b.gamesInCommon !== a.gamesInCommon) {
                 return b.gamesInCommon - a.gamesInCommon;
@@ -436,22 +489,24 @@ class SidewindersStats {
         }
         
         analysisData.forEach(data => {
-            const winTogetherClass = data.winPercentTogether >= 60 ? 'table-success' :
-                                   data.winPercentTogether <= 30 ? 'table-danger' : '';
+            const winTogetherClass = data.winPercentTogether >= 60 ? 'table-success-light' :
+                                   data.winPercentTogether <= 30 ? 'table-danger-light' : '';
             
-            const h2hClass = data.h2hWinPercent >= 60 ? 'table-success' :
-                           data.h2hWinPercent <= 30 && data.oppositeTeam > 0 ? 'table-danger' : '';
+            const h2hClass = data.h2hWinPercent >= 60 ? 'table-success-light' :
+                           data.h2hWinPercent <= 30 && data.oppositeTeam > 0 ? 'table-danger-light' : '';
             
             const row = `
                 <tr>
-                    <td class="fw-bold">${data.player}</td>
-                    <td>${data.gamesInCommon}</td>
-                    <td>${data.sameTeam}</td>
-                    <td>${data.oppositeTeam > 0 ? data.oppositeTeam : '-'}</td>
-                    <td class="${winTogetherClass}">
+                    <td class="fw-bold clickable-player" onclick="window.sidewindersApp.selectPlayer('${data.player.replace(/'/g, "\\'")}')">
+                        ${data.player}
+                    </td>
+                    <td class="text-center">${data.gamesInCommon}</td>
+                    <td class="text-center">${data.sameTeam}</td>
+                    <td class="text-center">${data.oppositeTeam > 0 ? data.oppositeTeam : '-'}</td>
+                    <td class="text-center ${winTogetherClass}">
                         ${data.sameTeam > 0 ? data.winPercentTogether + '%' : '-'}
                     </td>
-                    <td class="${h2hClass}">
+                    <td class="text-center ${h2hClass}">
                         ${data.oppositeTeam > 0 ? data.h2hWinPercent + '%' : '-'}
                     </td>
                 </tr>
@@ -461,85 +516,61 @@ class SidewindersStats {
     }
     
     updateLastUpdated() {
-        // Try to get last modified date of GameLog.csv
         fetch('GameLog.csv', { method: 'HEAD' })
             .then(response => {
                 const lastModified = response.headers.get('last-modified');
                 if (lastModified) {
                     const date = new Date(lastModified);
-                    const formatted = date.toLocaleDateString('en-GB', {
+                    $('#lastUpdated').text(date.toLocaleDateString('en-GB', {
                         day: '2-digit',
                         month: '2-digit',
                         year: 'numeric',
                         hour: '2-digit',
                         minute: '2-digit'
-                    });
-                    $('#lastUpdated').text(formatted);
+                    }));
                 } else {
-                    // Fallback to current date
                     const now = new Date();
-                    const formatted = now.toLocaleDateString('en-GB', {
+                    $('#lastUpdated').text(now.toLocaleDateString('en-GB', {
                         day: '2-digit',
                         month: '2-digit',
                         year: 'numeric'
-                    });
-                    $('#lastUpdated').text(formatted);
+                    }));
                 }
             })
             .catch(() => {
-                // If HEAD request fails, use current date
                 const now = new Date();
-                const formatted = now.toLocaleDateString('en-GB', {
+                $('#lastUpdated').text(now.toLocaleDateString('en-GB', {
                     day: '2-digit',
                     month: '2-digit',
                     year: 'numeric'
-                });
-                $('#lastUpdated').text(formatted);
+                }));
             });
     }
     
     showLoading(show) {
         if (show) {
             $('#loadingIndicator').show();
-            $('#leagueTable').closest('.stat-card').addClass('opacity-50');
         } else {
             $('#loadingIndicator').hide();
-            $('#leagueTable').closest('.stat-card').removeClass('opacity-50');
         }
     }
     
     showError(message) {
-        // Create error banner
         const errorHtml = `
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                 <strong>Error:</strong> ${message}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         `;
-        
-        // Insert at top
         $('.container').prepend(errorHtml);
     }
 }
 
-// Initialize the application when page loads
+// Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
-    // Add loading indicator if not in HTML
-    if ($('#loadingIndicator').length === 0) {
-        $('nav').after(`
-            <div id="loadingIndicator" class="container mt-3 text-center" style="display: none;">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2">Loading stats data...</p>
-            </div>
-        `);
-    }
-    
-    // Initialize the app
     window.sidewindersApp = new SidewindersStats();
     
-    // Add click handlers for navigation
+    // Navigation
     $('a[href="#league"]').click(function(e) {
         e.preventDefault();
         $('html, body').animate({
@@ -553,46 +584,38 @@ document.addEventListener('DOMContentLoaded', function() {
             scrollTop: $('#analysis').offset().top - 20
         }, 500);
     });
-    
-    // Auto-select player from URL hash
-    setTimeout(() => {
-        const hash = window.location.hash;
-        if (hash && hash.startsWith('#player-')) {
-            const playerName = decodeURIComponent(hash.substring(8));
-            if (playerName) {
-                // Wait for app to load
-                setTimeout(() => {
-                    if (window.sidewindersApp && window.sidewindersApp.players.includes(playerName)) {
-                        window.sidewindersApp.selectPlayer(playerName);
-                        $('html, body').animate({
-                            scrollTop: $('#analysis').offset().top - 20
-                        }, 500);
-                    }
-                }, 1000);
-            }
-        }
-    }, 500);
 });
 
-// Helper function to share player links
-function sharePlayerAnalysis(playerName) {
-    const url = new URL(window.location.href);
-    url.hash = `#player-${encodeURIComponent(playerName)}`;
+// Helper functions
+function shareCurrentPlayer() {
+    const playerSelect = document.getElementById('playerSelect');
+    const playerName = playerSelect.value;
     
-    // Copy to clipboard
+    if (!playerName) {
+        alert('Please select a player first.');
+        return;
+    }
+    
+    const url = new URL(window.location.href);
+    url.hash = `player-${encodeURIComponent(playerName)}`;
+    
     navigator.clipboard.writeText(url.toString())
         .then(() => {
-            alert(`Link copied to clipboard! Share this to show ${playerName}'s stats.`);
+            // Show success toast
+            const toast = `<div class="toast show position-fixed bottom-0 end-0 m-3" role="alert">
+                <div class="toast-header bg-success text-white">
+                    <strong class="me-auto">Success!</strong>
+                    <button type="button" class="btn-close btn-close-white" onclick="this.parentElement.parentElement.remove()"></button>
+                </div>
+                <div class="toast-body">
+                    Link to ${playerName}'s analysis copied to clipboard!
+                </div>
+            </div>`;
+            $('body').append(toast);
+            setTimeout(() => $('.toast').remove(), 3000);
         })
         .catch(err => {
             console.error('Failed to copy:', err);
+            alert('Failed to copy link. You can manually copy the URL from your browser.');
         });
 }
-
-// Add share button handler if not in HTML
-$(document).on('click', '.share-player', function() {
-    const playerName = $(this).data('player');
-    if (playerName) {
-        sharePlayerAnalysis(playerName);
-    }
-});
