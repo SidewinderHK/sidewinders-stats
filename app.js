@@ -1,38 +1,65 @@
-// Sidewinders Stats - Complete with mobile fixes
+// Sidewinders Stats - Fixed mobile loading and columns
 class SidewindersStats {
     constructor() {
         this.gameLog = [];
         this.leagueTable = [];
         this.players = [];
         this.selectedPlayer = null;
+        this.isLoading = false;
         
+        // Initialize when DOM is ready
         $(document).ready(() => {
+            console.log('DOM ready, initializing app...');
             this.init();
         });
     }
     
     async init() {
         try {
+            console.log('Starting initialization...');
             this.showLoading(true);
+            this.isLoading = true;
+            
             await this.loadAllData();
+            console.log('Data loaded, calculating league table...');
+            
             this.calculateLeagueTable();
+            console.log('League table calculated, initializing components...');
+            
             this.initLeagueTable();
             this.initPlayerSelector();
             this.updateLastUpdated();
+            
+            this.isLoading = false;
             this.showLoading(false);
+            console.log('Initialization complete!');
             
         } catch (error) {
             console.error('Initialization error:', error);
             this.showError('Failed to load data. Please check GameLog.csv file.');
             this.showLoading(false);
+            this.isLoading = false;
         }
     }
     
     async loadAllData() {
+        console.log('Loading CSV data...');
         try {
+            // First try to load the CSV
             const gameLogCSV = await this.fetchCSV('GameLog.csv');
+            
+            if (!gameLogCSV) {
+                throw new Error('GameLog.csv is empty or not found');
+            }
+            
+            console.log('CSV loaded, parsing data...');
             this.gameLog = this.parseCSV(gameLogCSV);
             
+            if (this.gameLog.length === 0) {
+                throw new Error('No data found in GameLog.csv');
+            }
+            
+            // Extract unique players
             this.players = [...new Set(this.gameLog.map(row => row['Player']))]
                 .filter(name => name && name.trim() !== '')
                 .sort();
@@ -41,7 +68,7 @@ class SidewindersStats {
             console.log(`Found ${this.players.length} unique players`);
             
         } catch (error) {
-            console.error('Error loading CSV file:', error);
+            console.error('Error in loadAllData:', error);
             throw error;
         }
     }
@@ -51,6 +78,7 @@ class SidewindersStats {
         
         const playerStats = {};
         
+        // Initialize all players
         this.players.forEach(player => {
             playerStats[player] = {
                 Player: player,
@@ -68,6 +96,7 @@ class SidewindersStats {
             };
         });
         
+        // Process each game record
         this.gameLog.forEach(game => {
             const player = game['Player'];
             if (!player || !playerStats[player]) return;
@@ -93,6 +122,7 @@ class SidewindersStats {
             stats.Penalties += parseInt(game['Pen']) || 0;
         });
         
+        // Calculate PPG and Win Percent for each player
         Object.values(playerStats).forEach(stats => {
             if (stats.Games > 0) {
                 stats.PPG = Math.round((stats.TotalPoints / stats.Games) * 10) / 10;
@@ -100,6 +130,7 @@ class SidewindersStats {
             }
         });
         
+        // Sort by Total Points, then PPG, then Win Percent
         this.leagueTable = Object.values(playerStats)
             .sort((a, b) => {
                 if (b.TotalPoints !== a.TotalPoints) return b.TotalPoints - a.TotalPoints;
@@ -110,34 +141,64 @@ class SidewindersStats {
                 return a.Player.localeCompare(b.Player);
             });
         
-        console.log('League table calculated:', this.leagueTable.length, 'players');
+        console.log(`League table calculated: ${this.leagueTable.length} players`);
     }
     
     async fetchCSV(filename) {
+        console.log(`Fetching ${filename}...`);
         try {
-            const response = await fetch(filename);
+            // Use cache-busting for mobile to avoid stale data
+            const url = `${filename}?t=${Date.now()}`;
+            const response = await fetch(url);
+            
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                throw new Error(`Failed to fetch ${filename}: ${response.status} ${response.statusText}`);
             }
-            return await response.text();
+            
+            const text = await response.text();
+            console.log(`${filename} loaded successfully (${text.length} chars)`);
+            return text;
+            
         } catch (error) {
-            console.warn(`Failed to fetch ${filename}:`, error);
-            return null;
+            console.error(`Error fetching ${filename}:`, error);
+            
+            // Try alternative approach for mobile
+            try {
+                console.log('Trying alternative fetch method...');
+                const response = await fetch(filename, {
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+                return await response.text();
+            } catch (retryError) {
+                console.error('Alternative fetch also failed:', retryError);
+                return null;
+            }
         }
     }
     
     parseCSV(csvText) {
         if (!csvText || csvText.trim() === '') {
+            console.warn('CSV text is empty');
             return [];
         }
         
         const lines = csvText.split('\n').filter(line => line.trim() !== '');
-        if (lines.length < 2) return [];
+        if (lines.length < 2) {
+            console.warn('CSV has less than 2 lines');
+            return [];
+        }
         
+        // Parse headers
         const headers = this.parseCSVLine(lines[0]).map(h => 
             h.replace(/^"(.*)"$/, '$1').trim()
         );
         
+        console.log('CSV headers:', headers);
+        
+        // Parse data rows
         const data = [];
         for (let i = 1; i < lines.length; i++) {
             const values = this.parseCSVLine(lines[i]);
@@ -149,6 +210,7 @@ class SidewindersStats {
                     let value = values[index];
                     value = value.replace(/^"(.*)"$/, '$1').trim();
                     
+                    // Convert numeric columns
                     const numericColumns = ['Gls', 'OG', 'Ast', 'Pen'];
                     if (numericColumns.includes(header) && !isNaN(value) && value !== '') {
                         value = Number(value);
@@ -163,6 +225,7 @@ class SidewindersStats {
             }
         }
         
+        console.log(`Parsed ${data.length} rows from CSV`);
         return data;
     }
     
@@ -195,21 +258,26 @@ class SidewindersStats {
     }
     
     initLeagueTable() {
+        console.log('Initializing league table...');
+        
         if (this.leagueTable.length === 0) {
             $('#leagueTable').html('<tr><td colspan="12" class="text-center">No game data available</td></tr>');
             return;
         }
         
+        // Destroy existing DataTable if it exists
         if ($.fn.DataTable.isDataTable('#leagueTable')) {
             $('#leagueTable').DataTable().destroy();
+            $('#leagueTable').empty();
         }
         
+        // Create table with proper mobile scrolling
         const table = $('#leagueTable').DataTable({
             data: this.leagueTable,
             columns: [
                 { 
                     data: 'Player',
-                    className: 'fw-bold clickable-player sticky-column',
+                    className: 'fw-bold clickable-player',
                     render: function(data, type, row) {
                         return `<span class="clickable-player">${data}</span>`;
                     }
@@ -292,9 +360,9 @@ class SidewindersStats {
                     }
                 }
             ],
-            order: [[9, 'desc']],
+            order: [[9, 'desc']], // Default sort by Total Points (column 9)
             pageLength: 25,
-            responsive: false,
+            responsive: true,
             scrollX: true,
             scrollCollapse: true,
             fixedHeader: true,
@@ -302,10 +370,14 @@ class SidewindersStats {
                 search: "Search players:",
                 lengthMenu: "Show _MENU_ entries",
                 info: "Showing _START_ to _END_ of _TOTAL_ players"
+            },
+            initComplete: function() {
+                console.log('DataTable initialization complete');
             }
         });
         
-        $('#leagueTable tbody').on('click', 'td:first-child', (event) => {
+        // Click handler for player names
+        $('#leagueTable').on('click', 'tbody td:first-child', (event) => {
             const playerName = $(event.target).text().trim();
             if (playerName && this.players.includes(playerName)) {
                 this.selectPlayer(playerName);
@@ -314,9 +386,12 @@ class SidewindersStats {
                 }, 500);
             }
         });
+        
+        console.log('League table initialized with', this.leagueTable.length, 'players');
     }
     
     initPlayerSelector() {
+        console.log('Initializing player selector...');
         const select = $('#playerSelect');
         select.empty();
         select.append('<option value="">Choose a player...</option>');
@@ -331,20 +406,25 @@ class SidewindersStats {
                 this.selectPlayer(player);
             }
         });
+        
+        console.log('Player selector initialized with', this.players.length, 'players');
     }
     
     selectPlayer(playerName) {
+        console.log('Selecting player:', playerName);
         this.selectedPlayer = playerName;
         $('#playerSelect').val(playerName);
         this.showPlayerAnalysis(playerName);
     }
     
     showPlayerAnalysis(playerName) {
+        console.log('Showing analysis for:', playerName);
         $('#playerName').text(playerName);
         
         const playerStats = this.leagueTable.find(row => row.Player === playerName);
         
         if (playerStats) {
+            // Update all stats
             $('#totalGames').text(playerStats.Games);
             $('#totalWins').text(playerStats.Wins);
             $('#totalDraws').text(playerStats.Draws);
@@ -355,19 +435,27 @@ class SidewindersStats {
             $('#totalOwnGoals').text(playerStats.OwnGoals);
             $('#totalPenalties').text(playerStats.Penalties);
             
+            // Calculate Goal Contributions (Goals + Assists)
             const goalContributions = playerStats.Goals + playerStats.Assists;
             $('#goalContributions').text(goalContributions);
             
+            // Set win percentage
             $('#winPercent').text(playerStats.WinPercent + '%');
             $('#winPercentBar').css('width', playerStats.WinPercent + '%');
         }
         
+        // Show the stats section
         $('#playerStats').show();
+        
+        // Enable share button
         $('#shareButton').prop('disabled', false);
+        
+        // Show partnership analysis
         this.showPartnershipAnalysis(playerName);
     }
     
     showPartnershipAnalysis(selectedPlayer) {
+        console.log('Calculating partnerships for:', selectedPlayer);
         const analysisData = [];
         
         this.players.forEach(otherPlayer => {
@@ -382,6 +470,7 @@ class SidewindersStats {
             let oppositeTeamGames = 0;
             let selectedWinsVsOther = 0;
             
+            // Create maps for quick lookup
             const selectedGameMap = {};
             selectedGames.forEach(game => {
                 const key = game['ID'] + '|' + game['Team'];
@@ -394,6 +483,7 @@ class SidewindersStats {
                 otherGameMap[key] = game;
             });
             
+            // Find same team games
             Object.keys(selectedGameMap).forEach(key => {
                 if (otherGameMap[key]) {
                     gamesInCommon++;
@@ -405,6 +495,7 @@ class SidewindersStats {
                 }
             });
             
+            // Find opposite team games
             selectedGames.forEach(sGame => {
                 otherGames.forEach(oGame => {
                     if (sGame['ID'] === oGame['ID'] && sGame['Team'] !== oGame['Team']) {
@@ -437,6 +528,7 @@ class SidewindersStats {
             }
         });
         
+        // Sort by games in common (descending)
         analysisData.sort((a, b) => {
             if (b.gamesInCommon !== a.gamesInCommon) {
                 return b.gamesInCommon - a.gamesInCommon;
@@ -444,6 +536,7 @@ class SidewindersStats {
             return b.winPercentTogether - a.winPercentTogether;
         });
         
+        // Update partnership table
         const tableBody = $('#partnershipTable tbody');
         tableBody.empty();
         
@@ -483,10 +576,13 @@ class SidewindersStats {
             `;
             tableBody.append(row);
         });
+        
+        console.log('Partnership analysis complete:', analysisData.length, 'teammates');
     }
     
     updateLastUpdated() {
-        fetch('GameLog.csv', { method: 'HEAD' })
+        // Use cache busting for mobile
+        fetch('GameLog.csv?t=' + Date.now(), { method: 'HEAD' })
             .then(response => {
                 const lastModified = response.headers.get('last-modified');
                 if (lastModified) {
@@ -520,8 +616,10 @@ class SidewindersStats {
     showLoading(show) {
         if (show) {
             $('#loadingIndicator').show();
+            $('.stat-card').addClass('opacity-50');
         } else {
             $('#loadingIndicator').hide();
+            $('.stat-card').removeClass('opacity-50');
         }
     }
     
@@ -536,10 +634,12 @@ class SidewindersStats {
     }
 }
 
-// Initialize the application
-document.addEventListener('DOMContentLoaded', function() {
+// Initialize the application when page loads
+$(document).ready(function() {
+    console.log('Document ready, starting app...');
     window.sidewindersApp = new SidewindersStats();
     
+    // Navigation smooth scrolling
     $('a[href="#league"]').click(function(e) {
         e.preventDefault();
         $('html, body').animate({
@@ -553,8 +653,14 @@ document.addEventListener('DOMContentLoaded', function() {
             scrollTop: $('#analysis').offset().top - 20
         }, 500);
     });
+    
+    // Add mobile-friendly touch events
+    if ('ontouchstart' in window) {
+        $('.clickable-player').css('cursor', 'pointer');
+    }
 });
 
+// Helper function to share player analysis
 function shareCurrentPlayer() {
     const playerSelect = document.getElementById('playerSelect');
     const playerName = playerSelect.value;
@@ -569,20 +675,39 @@ function shareCurrentPlayer() {
     
     navigator.clipboard.writeText(url.toString())
         .then(() => {
-            const toast = `<div class="toast show position-fixed bottom-0 end-0 m-3" role="alert">
+            // Show toast notification
+            const toast = `<div class="toast show position-fixed bottom-0 end-0 m-3" style="z-index: 9999">
                 <div class="toast-header bg-success text-white">
-                    <strong class="me-auto">Success!</strong>
+                    <strong class="me-auto"><i class="fas fa-check-circle me-1"></i> Success</strong>
                     <button type="button" class="btn-close btn-close-white" onclick="this.parentElement.parentElement.remove()"></button>
                 </div>
                 <div class="toast-body">
                     Link to ${playerName}'s analysis copied to clipboard!
                 </div>
             </div>`;
+            
+            // Remove any existing toasts
+            $('.toast').remove();
             $('body').append(toast);
-            setTimeout(() => $('.toast').remove(), 3000);
+            
+            // Auto-remove after 3 seconds
+            setTimeout(() => {
+                $('.toast').remove();
+            }, 3000);
         })
         .catch(err => {
             console.error('Failed to copy:', err);
             alert('Failed to copy link. You can manually copy the URL from your browser.');
         });
+}
+
+// Debug function to check if everything loaded
+function debugApp() {
+    console.log('=== DEBUG INFO ===');
+    console.log('GameLog records:', window.sidewindersApp?.gameLog?.length || 0);
+    console.log('League table:', window.sidewindersApp?.leagueTable?.length || 0);
+    console.log('Players:', window.sidewindersApp?.players?.length || 0);
+    console.log('Selected player:', window.sidewindersApp?.selectedPlayer);
+    console.log('Is loading:', window.sidewindersApp?.isLoading);
+    console.log('==================');
 }
