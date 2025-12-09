@@ -207,104 +207,227 @@ class SidewindersStats {
             $('#leagueTable').DataTable().destroy();
         }
         
+        // Define columns with proper sorting types
+        const columns = [
+            { 
+                data: 'Player',
+                className: 'fw-bold clickable-player',
+                render: function(data, type, row) {
+                    return `<span class="clickable-player">${data}</span>`;
+                },
+                type: 'string'
+            },
+            { 
+                data: 'Games',
+                className: 'text-center',
+                title: 'Games',
+                type: 'num',
+                render: function(data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return data;
+                    }
+                    return data;
+                }
+            },
+            { 
+                data: 'Wins',
+                className: 'text-center',
+                title: 'Wins',
+                type: 'num',
+                render: function(data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return data;
+                    }
+                    return data;
+                }
+            },
+            { 
+                data: 'Draws',
+                className: 'text-center',
+                title: 'Draws',
+                type: 'num',
+                render: function(data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return data;
+                    }
+                    return data;
+                }
+            },
+            { 
+                data: 'Losses',
+                className: 'text-center',
+                title: 'Losses',
+                type: 'num',
+                render: function(data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return data;
+                    }
+                    return data;
+                }
+            },
+            { 
+                data: 'Goals',
+                className: 'text-center fw-bold text-primary',
+                title: 'Goals',
+                type: 'num',
+                render: function(data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return data;
+                    }
+                    return `<span class="goals-highlight">${data}</span>`;
+                }
+            },
+            { 
+                data: 'OwnGoals',
+                className: 'text-center',
+                title: 'Own Goals',
+                type: 'num',
+                render: function(data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return data;
+                    }
+                    return data;
+                }
+            },
+            { 
+                data: 'Assists',
+                className: 'text-center',
+                title: 'Assists',
+                type: 'num',
+                render: function(data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return data;
+                    }
+                    return data;
+                }
+            },
+            { 
+                data: 'Penalties',
+                className: 'text-center',
+                title: 'Penalties',
+                type: 'num',
+                render: function(data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return data;
+                    }
+                    return data;
+                }
+            },
+            { 
+                data: 'TotalPoints',
+                className: 'text-center fw-bold text-success',
+                title: 'Total Points',
+                type: 'num',
+                render: function(data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return data;
+                    }
+                    return `<strong class="points-badge">${data}</strong>`;
+                }
+            },
+            { 
+                data: 'PPG',
+                className: 'text-center fw-bold',
+                title: 'PPG',
+                type: 'num',
+                render: function(data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return data;
+                    }
+                    return `<span class="ppg-value" title="Points Per Game">${data.toFixed(1)}</span>`;
+                }
+            },
+            { 
+                data: 'WinPercent',
+                className: 'text-center',
+                title: 'Win %',
+                type: 'num',
+                render: function(data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return data;
+                    }
+                    let color = '#dc3545'; // red
+                    if (data >= 60) color = '#198754'; // green
+                    else if (data >= 40) color = '#fd7e14'; // orange
+                    
+                    return `<span style="color: ${color}; font-weight: bold">${data}%</span>`;
+                }
+            }
+        ];
+        
+        // Initialize DataTable with sorting
         const table = $('#leagueTable').DataTable({
             data: this.leagueTable,
-            columns: [
-                { 
-                    data: 'Player',
-                    className: 'fw-bold clickable-player',
-                    render: function(data, type, row) {
-                        return `<span class="clickable-player">${data}</span>`;
-                    }
-                },
-                { 
-                    data: 'Games',
-                    className: 'text-center',
-                    title: 'Games'
-                },
-                { 
-                    data: 'Wins',
-                    className: 'text-center',
-                    title: 'Wins'
-                },
-                { 
-                    data: 'Draws',
-                    className: 'text-center',
-                    title: 'Draws'
-                },
-                { 
-                    data: 'Losses',
-                    className: 'text-center',
-                    title: 'Losses'
-                },
-                { 
-                    data: 'Goals',
-                    className: 'text-center fw-bold text-primary',
-                    title: 'Goals'
-                },
-                { 
-                    data: 'OwnGoals',
-                    className: 'text-center',
-                    title: 'Own Goals'
-                },
-                { 
-                    data: 'Assists',
-                    className: 'text-center',
-                    title: 'Assists'
-                },
-                { 
-                    data: 'Penalties',
-                    className: 'text-center',
-                    title: 'Penalties'
-                },
-                { 
-                    data: 'TotalPoints',
-                    className: 'text-center fw-bold text-success',
-                    title: 'Total Points',
-                    render: function(data, type, row) {
-                        if (type === 'sort' || type === 'type') {
-                            return data;
-                        }
-                        return `<strong class="points-badge">${data}</strong>`;
-                    }
-                },
-                { 
-                    data: 'PPG',
-                    className: 'text-center fw-bold',
-                    title: 'PPG',
-                    render: function(data, type, row) {
-                        if (type === 'sort' || type === 'type') {
-                            return data;
-                        }
-                        return `<span class="ppg-value">${data.toFixed(1)}</span>`;
-                    }
-                },
-                { 
-                    data: 'WinPercent',
-                    className: 'text-center',
-                    title: 'Win %',
-                    render: function(data, type, row) {
-                        if (type === 'sort' || type === 'type') {
-                            return data;
-                        }
-                        let color = '#dc3545'; // red
-                        if (data >= 60) color = '#198754'; // green
-                        else if (data >= 40) color = '#fd7e14'; // orange
-                        
-                        return `<span style="color: ${color}; font-weight: bold">${data}%</span>`;
-                    }
-                }
-            ],
-            order: [[9, 'desc']], // Default sort by Total Points (column 9) descending
+            columns: columns,
+            order: [[9, 'desc']], // Default sort by Total Points descending
             pageLength: 25,
             responsive: true,
+            stateSave: true, // Remember sorting/filtering between page refreshes
+            stateDuration: 60 * 60 * 24 * 7, // 1 week
             language: {
                 search: "Search players:",
                 lengthMenu: "Show _MENU_ entries",
-                info: "Showing _START_ to _END_ of _TOTAL_ players"
+                info: "Showing _START_ to _END_ of _TOTAL_ players",
+                infoEmpty: "No players to show",
+                infoFiltered: "(filtered from _MAX_ total players)",
+                emptyTable: "No game data available",
+                zeroRecords: "No matching players found",
+                paginate: {
+                    first: "First",
+                    last: "Last",
+                    next: "Next",
+                    previous: "Previous"
+                }
+            },
+            initComplete: function() {
+                // Add custom sorting indicator
+                const api = this.api();
+                api.columns().every(function() {
+                    const column = this;
+                    const header = $(column.header());
+                    
+                    // Add clickable area for sorting
+                    header.css('cursor', 'pointer');
+                    header.attr('title', 'Click to sort');
+                    
+                    // Add sorting indicator
+                    header.append('<span class="sort-indicator ms-1"><i class="fas fa-sort"></i></span>');
+                    
+                    header.on('click', function(e) {
+                        if ($(e.target).hasClass('no-sort')) return;
+                        
+                        const currentOrder = column.order()[0];
+                        const newOrder = currentOrder[1] === 'asc' ? 'desc' : 'asc';
+                        
+                        // Update all indicators
+                        api.columns().every(function() {
+                            $(this.header()).find('.sort-indicator i')
+                                .removeClass('fa-sort-up fa-sort-down')
+                                .addClass('fa-sort');
+                        });
+                        
+                        // Update current column indicator
+                        const indicator = header.find('.sort-indicator i');
+                        indicator.removeClass('fa-sort')
+                            .addClass(newOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+                        
+                        // Perform sort
+                        api.order([column.index(), newOrder]).draw();
+                    });
+                });
+                
+                // Update indicator for initial sort
+                const initialColumn = api.order()[0];
+                if (initialColumn) {
+                    const header = $(api.column(initialColumn[0]).header());
+                    const indicator = header.find('.sort-indicator i');
+                    indicator.removeClass('fa-sort')
+                        .addClass(initialColumn[1] === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+                }
             }
         });
         
+        // Add click handler for player names
         $('#leagueTable tbody').on('click', 'td:first-child', (event) => {
             const playerName = $(event.target).text().trim();
             if (playerName && this.players.includes(playerName)) {
@@ -312,6 +435,175 @@ class SidewindersStats {
                 $('html, body').animate({
                     scrollTop: $('#analysis').offset().top - 20
                 }, 500);
+            }
+        });
+        
+        // Add quick sort buttons
+        this.addQuickSortButtons();
+    }
+    
+    addQuickSortButtons() {
+        // Remove existing sort buttons if any
+        $('#quickSortButtons').remove();
+        
+        const quickSortHtml = `
+            <div id="quickSortButtons" class="mb-3">
+                <div class="btn-group" role="group">
+                    <span class="me-2 align-middle d-none d-md-inline" style="line-height: 38px;">Quick sort:</span>
+                    <button class="btn btn-outline-primary btn-sm sort-btn" data-sort="9" data-order="desc">
+                        <i class="fas fa-trophy me-1"></i> Points
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm sort-btn" data-sort="10" data-order="desc">
+                        <i class="fas fa-chart-line me-1"></i> PPG
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm sort-btn" data-sort="4" data-order="desc">
+                        <i class="fas fa-futbol me-1"></i> Goals
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm sort-btn" data-sort="7" data-order="desc">
+                        <i class="fas fa-handshake me-1"></i> Assists
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm sort-btn" data-sort="11" data-order="desc">
+                        <i class="fas fa-percentage me-1"></i> Win %
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm sort-btn" data-sort="0" data-order="asc">
+                        <i class="fas fa-sort-alpha-down me-1"></i> A-Z
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        $('#leagueTable_wrapper').prepend(quickSortHtml);
+        
+        // Add click handlers for quick sort buttons
+        $('.sort-btn').on('click', (e) => {
+            const button = $(e.currentTarget);
+            const columnIndex = parseInt(button.data('sort'));
+            const order = button.data('order');
+            
+            const table = $('#leagueTable').DataTable();
+            
+            // Update all indicators
+            $('.sort-btn').removeClass('active');
+            button.addClass('active');
+            
+            // Perform sort
+            table.order([columnIndex, order]).draw();
+            
+            // Update header indicators
+            const api = table.api();
+            api.columns().every(function() {
+                $(this.header()).find('.sort-indicator i')
+                    .removeClass('fa-sort-up fa-sort-down')
+                    .addClass('fa-sort');
+            });
+            
+            const header = $(api.column(columnIndex).header());
+            const indicator = header.find('.sort-indicator i');
+            indicator.removeClass('fa-sort')
+                .addClass(order === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+        });
+        
+        // Set initial active button (Points)
+        $('.sort-btn[data-sort="9"]').addClass('active');
+    }
+    
+    resetSorting() {
+        const table = $('#leagueTable').DataTable();
+        table.order([[9, 'desc']]).draw(); // Reset to Total Points descending
+        
+        // Update indicators
+        const api = table.api();
+        api.columns().every(function() {
+            $(this.header()).find('.sort-indicator i')
+                .removeClass('fa-sort-up fa-sort-down')
+                .addClass('fa-sort');
+        });
+        
+        // Update the Total Points column indicator
+        const header = $(api.column(9).header());
+        const indicator = header.find('.sort-indicator i');
+        indicator.removeClass('fa-sort').addClass('fa-sort-down');
+        
+        // Update quick sort buttons
+        $('.sort-btn').removeClass('active');
+        $('.sort-btn[data-sort="9"]').addClass('active');
+    }
+    
+    initPartnershipTable(data) {
+        // Destroy existing DataTable if it exists
+        if ($.fn.DataTable.isDataTable('#partnershipTable')) {
+            $('#partnershipTable').DataTable().destroy();
+            $('#partnershipTable tbody').empty();
+        }
+        
+        // If no data, don't initialize DataTable
+        if (!data || data.length === 0) {
+            return;
+        }
+        
+        // Initialize DataTable
+        const table = $('#partnershipTable').DataTable({
+            paging: false,
+            searching: false,
+            info: false,
+            ordering: true,
+            order: [[1, 'desc']], // Default sort by Games Together descending
+            responsive: true,
+            language: {
+                emptyTable: "No partnership data available",
+                zeroRecords: "No matching partnerships found"
+            },
+            columnDefs: [
+                {
+                    targets: 0,
+                    orderable: true,
+                    type: 'string'
+                },
+                {
+                    targets: [1, 2, 3, 4, 5],
+                    orderable: true,
+                    type: 'num'
+                }
+            ],
+            initComplete: function() {
+                // Add sorting indicators
+                const api = this.api();
+                api.columns().every(function() {
+                    const column = this;
+                    const header = $(column.header());
+                    
+                    header.css('cursor', 'pointer');
+                    header.attr('title', 'Click to sort');
+                    header.append('<span class="sort-indicator ms-1"><i class="fas fa-sort"></i></span>');
+                    
+                    header.on('click', function(e) {
+                        const currentOrder = column.order()[0];
+                        const newOrder = currentOrder[1] === 'asc' ? 'desc' : 'asc';
+                        
+                        // Update all indicators
+                        api.columns().every(function() {
+                            $(this.header()).find('.sort-indicator i')
+                                .removeClass('fa-sort-up fa-sort-down')
+                                .addClass('fa-sort');
+                        });
+                        
+                        // Update current column indicator
+                        const indicator = header.find('.sort-indicator i');
+                        indicator.removeClass('fa-sort')
+                            .addClass(newOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+                        
+                        api.order([column.index(), newOrder]).draw();
+                    });
+                });
+                
+                // Update initial sort indicator
+                const initialColumn = api.order()[0];
+                if (initialColumn) {
+                    const header = $(api.column(initialColumn[0]).header());
+                    const indicator = header.find('.sort-indicator i');
+                    indicator.removeClass('fa-sort')
+                        .addClass(initialColumn[1] === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+                }
             }
         });
     }
@@ -457,6 +749,7 @@ class SidewindersStats {
                     </td>
                 </tr>
             `);
+            this.initPartnershipTable([]); // Initialize empty DataTable
             return;
         }
         
@@ -472,19 +765,22 @@ class SidewindersStats {
                     <td class="fw-bold clickable-player" onclick="window.sidewindersApp.selectPlayer('${data.player.replace(/'/g, "\\'")}')">
                         ${data.player}
                     </td>
-                    <td class="text-center">${data.gamesInCommon}</td>
-                    <td class="text-center">${data.sameTeam}</td>
-                    <td class="text-center">${data.oppositeTeam > 0 ? data.oppositeTeam : '-'}</td>
-                    <td class="text-center ${winTogetherClass}">
+                    <td class="text-center" data-order="${data.gamesInCommon}">${data.gamesInCommon}</td>
+                    <td class="text-center" data-order="${data.sameTeam}">${data.sameTeam}</td>
+                    <td class="text-center" data-order="${data.oppositeTeam}">${data.oppositeTeam > 0 ? data.oppositeTeam : '-'}</td>
+                    <td class="text-center ${winTogetherClass}" data-order="${data.winPercentTogether}">
                         ${data.sameTeam > 0 ? data.winPercentTogether + '%' : '-'}
                     </td>
-                    <td class="text-center ${h2hClass}">
+                    <td class="text-center ${h2hClass}" data-order="${data.h2hWinPercent}">
                         ${data.oppositeTeam > 0 ? data.h2hWinPercent + '%' : '-'}
                     </td>
                 </tr>
             `;
             tableBody.append(row);
         });
+        
+        // Initialize DataTable for partnership table
+        this.initPartnershipTable(analysisData);
     }
     
     updateLastUpdated() {
