@@ -355,7 +355,7 @@ class SidewindersStats {
             }
         ];
         
-        // Initialize DataTable with sorting - LET DATATABLES HANDLE SORTING
+        // Initialize DataTable with sorting
         const table = $('#leagueTable').DataTable({
             data: this.leagueTable,
             columns: columns,
@@ -503,136 +503,6 @@ class SidewindersStats {
         $('.sort-btn[data-sort="9"]').addClass('active');
     }
     
-    clearPartnershipTable() {
-        if ($.fn.DataTable.isDataTable('#partnershipTable')) {
-            $('#partnershipTable').DataTable().destroy();
-        }
-        $('#partnershipTable tbody').empty();
-    }
-    
-    initPartnershipTable(data) {
-        // Destroy existing DataTable if it exists
-        if ($.fn.DataTable.isDataTable('#partnershipTable')) {
-            $('#partnershipTable').DataTable().destroy();
-        }
-        
-        $('#partnershipTable tbody').empty();
-        
-        if (!data || data.length === 0) {
-            $('#partnershipTable tbody').html(`
-                <tr>
-                    <td colspan="6" class="text-center text-muted">
-                        No partnership data available for this player
-                    </td>
-                </tr>
-            `);
-            return;
-        }
-        
-        // Add data to table
-        data.forEach(item => {
-            const winTogetherClass = item.winPercentTogether >= 60 ? 'table-success-light' :
-                                   item.winPercentTogether <= 30 ? 'table-danger-light' : '';
-            
-            const h2hClass = item.h2hWinPercent >= 60 ? 'table-success-light' :
-                           item.h2hWinPercent <= 30 && item.oppositeTeam > 0 ? 'table-danger-light' : '';
-            
-            const row = `
-                <tr>
-                    <td class="fw-bold clickable-player" onclick="window.sidewindersApp.selectPlayer('${item.player.replace(/'/g, "\\'")}')">
-                        ${item.player}
-                    </td>
-                    <td class="text-center">${item.gamesInCommon}</td>
-                    <td class="text-center">${item.sameTeam}</td>
-                    <td class="text-center">${item.oppositeTeam > 0 ? item.oppositeTeam : '-'}</td>
-                    <td class="text-center ${winTogetherClass}">
-                        ${item.sameTeam > 0 ? item.winPercentTogether + '%' : '-'}
-                    </td>
-                    <td class="text-center ${h2hClass}">
-                        ${item.oppositeTeam > 0 ? item.h2hWinPercent + '%' : '-'}
-                    </td>
-                </tr>
-            `;
-            $('#partnershipTable tbody').append(row);
-        });
-        
-        // Initialize DataTable AFTER adding data
-        const table = $('#partnershipTable').DataTable({
-            paging: false,
-            searching: false,
-            info: false,
-            ordering: true,
-            order: [[1, 'desc']], // Default sort by Games Together descending
-            responsive: true,
-            language: {
-                emptyTable: "No partnership data available",
-                zeroRecords: "No matching partnerships found"
-            },
-            columnDefs: [
-                {
-                    targets: 0,
-                    orderable: true,
-                    type: 'string'
-                },
-                {
-                    targets: [1, 2, 3],
-                    orderable: true,
-                    type: 'num'
-                },
-                {
-                    targets: [4, 5],
-                    orderable: true,
-                    type: 'num',
-                    render: function(data, type, row) {
-                        if (type === 'sort' || type === 'type') {
-                            // Extract numeric value for sorting
-                            const num = parseFloat(data.replace('%', '')) || 0;
-                            return num;
-                        }
-                        return data;
-                    }
-                }
-            ],
-            initComplete: function() {
-                // Add sorting indicators
-                const api = this.api();
-                
-                // Listen for draw events to update indicators
-                api.on('draw.dt', function() {
-                    const order = api.order();
-                    if (order.length > 0) {
-                        const colIndex = order[0][0];
-                        const dir = order[0][1];
-                        
-                        // Update all indicators
-                        api.columns().every(function() {
-                            $(this.header()).find('.sort-indicator i')
-                                .removeClass('fa-sort-up fa-sort-down')
-                                .addClass('fa-sort');
-                        });
-                        
-                        // Update active column indicator
-                        const header = $(api.column(colIndex).header());
-                        const indicator = header.find('.sort-indicator i');
-                        indicator.removeClass('fa-sort')
-                            .addClass(dir === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
-                    }
-                });
-                
-                // Initialize indicators
-                const order = api.order();
-                if (order.length > 0) {
-                    const colIndex = order[0][0];
-                    const dir = order[0][1];
-                    const header = $(api.column(colIndex).header());
-                    const indicator = header.find('.sort-indicator i');
-                    indicator.removeClass('fa-sort')
-                        .addClass(dir === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
-                }
-            }
-        });
-    }
-    
     initPlayerSelector() {
         const select = $('#playerSelect');
         select.empty();
@@ -657,6 +527,8 @@ class SidewindersStats {
     }
     
     showPlayerAnalysis(playerName) {
+        console.log(`Showing analysis for player: ${playerName}`);
+        
         $('#playerName').text(playerName);
         
         const playerStats = this.leagueTable.find(row => row.Player === playerName);
@@ -682,11 +554,9 @@ class SidewindersStats {
         $('#playerStats').show();
         $('#shareButton').prop('disabled', false);
         
-        // Clear and show loading for partnership table
-        this.clearPartnershipTable();
-        
-        // Show loading message
-        $('#partnershipTable tbody').html(`
+        // Show loading state for partnership table
+        const tableBody = $('#partnershipTable tbody');
+        tableBody.html(`
             <tr>
                 <td colspan="6" class="text-center">
                     <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
@@ -695,10 +565,10 @@ class SidewindersStats {
             </tr>
         `);
         
-        // Calculate and show partnership data with a slight delay
+        // Calculate and show partnership data
         setTimeout(() => {
             this.showPartnershipAnalysis(playerName);
-        }, 50);
+        }, 100);
     }
     
     showPartnershipAnalysis(selectedPlayer) {
@@ -773,7 +643,7 @@ class SidewindersStats {
             }
         });
         
-        console.log(`Found ${analysisData.length} partnerships`);
+        console.log(`Found ${analysisData.length} partnerships for ${selectedPlayer}`);
         
         // Sort by games in common first
         analysisData.sort((a, b) => {
@@ -783,8 +653,167 @@ class SidewindersStats {
             return b.winPercentTogether - a.winPercentTogether;
         });
         
-        // Initialize the partnership table
-        this.initPartnershipTable(analysisData);
+        // Clear and populate the partnership table
+        this.populatePartnershipTable(analysisData);
+    }
+    
+    populatePartnershipTable(data) {
+        console.log("Populating partnership table with", data.length, "rows");
+        
+        const tableBody = $('#partnershipTable tbody');
+        tableBody.empty();
+        
+        if (!data || data.length === 0) {
+            tableBody.html(`
+                <tr>
+                    <td colspan="6" class="text-center text-muted">
+                        No partnership data available for this player
+                    </td>
+                </tr>
+            `);
+            return;
+        }
+        
+        // Add data rows
+        data.forEach(item => {
+            const winTogetherClass = item.winPercentTogether >= 60 ? 'table-success-light' :
+                                   item.winPercentTogether <= 30 ? 'table-danger-light' : '';
+            
+            const h2hClass = item.h2hWinPercent >= 60 ? 'table-success-light' :
+                           item.h2hWinPercent <= 30 && item.oppositeTeam > 0 ? 'table-danger-light' : '';
+            
+            const row = `
+                <tr>
+                    <td class="fw-bold clickable-player">
+                        ${item.player}
+                    </td>
+                    <td class="text-center">${item.gamesInCommon}</td>
+                    <td class="text-center">${item.sameTeam}</td>
+                    <td class="text-center">${item.oppositeTeam > 0 ? item.oppositeTeam : '-'}</td>
+                    <td class="text-center ${winTogetherClass}">${item.sameTeam > 0 ? item.winPercentTogether + '%' : '-'}</td>
+                    <td class="text-center ${h2hClass}">${item.oppositeTeam > 0 ? item.h2hWinPercent + '%' : '-'}</td>
+                </tr>
+            `;
+            tableBody.append(row);
+        });
+        
+        // Initialize DataTable AFTER populating data
+        this.initPartnershipDataTable();
+        
+        // Add click handlers to player names
+        $('#partnershipTable tbody').on('click', 'td:first-child', (event) => {
+            const playerName = $(event.target).text().trim();
+            if (playerName && this.players.includes(playerName)) {
+                this.selectPlayer(playerName);
+            }
+        });
+    }
+    
+    initPartnershipDataTable() {
+        console.log("Initializing partnership DataTable");
+        
+        // Destroy existing DataTable if it exists
+        if ($.fn.DataTable.isDataTable('#partnershipTable')) {
+            console.log("Destroying existing partnership DataTable");
+            $('#partnershipTable').DataTable().destroy();
+            $('#partnershipTable').css('width', '');
+        }
+        
+        try {
+            // Initialize DataTable
+            const table = $('#partnershipTable').DataTable({
+                paging: false,
+                searching: false,
+                info: false,
+                ordering: true,
+                order: [[1, 'desc']], // Default sort by Games Together descending
+                responsive: true,
+                language: {
+                    emptyTable: "No partnership data available",
+                    zeroRecords: "No matching partnerships found"
+                },
+                columnDefs: [
+                    {
+                        targets: 0,
+                        orderable: true,
+                        type: 'string'
+                    },
+                    {
+                        targets: [1, 2, 3],
+                        orderable: true,
+                        type: 'num'
+                    },
+                    {
+                        targets: [4, 5],
+                        orderable: true,
+                        type: 'num',
+                        render: function(data, type, row) {
+                            if (type === 'sort' || type === 'type') {
+                                // Extract numeric value for sorting
+                                if (data === '-') return -1;
+                                const num = parseFloat(data.replace('%', '')) || 0;
+                                return num;
+                            }
+                            return data;
+                        }
+                    }
+                ],
+                initComplete: function() {
+                    console.log("Partnership DataTable initialized successfully");
+                    
+                    // Add sorting indicators to headers
+                    const api = this.api();
+                    
+                    // Add indicators to column headers
+                    api.columns().every(function() {
+                        const column = this;
+                        const header = $(column.header());
+                        
+                        if (!header.find('.sort-indicator').length) {
+                            header.append('<span class="sort-indicator ms-1"><i class="fas fa-sort"></i></span>');
+                        }
+                    });
+                    
+                    // Update indicators based on current sort
+                    const order = api.order();
+                    if (order.length > 0) {
+                        const colIndex = order[0][0];
+                        const dir = order[0][1];
+                        const header = $(api.column(colIndex).header());
+                        const indicator = header.find('.sort-indicator i');
+                        indicator.removeClass('fa-sort')
+                            .addClass(dir === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+                    }
+                    
+                    // Listen for sort events
+                    api.on('order.dt', function(e, settings, details) {
+                        console.log("Partnership table sorted by column", details.column, "direction", details.order);
+                        
+                        // Update all indicators
+                        api.columns().every(function() {
+                            $(this.header()).find('.sort-indicator i')
+                                .removeClass('fa-sort-up fa-sort-down')
+                                .addClass('fa-sort');
+                        });
+                        
+                        // Update current column indicator
+                        if (details.order.length > 0) {
+                            const colIndex = details.order[0].col;
+                            const dir = details.order[0].dir;
+                            const header = $(api.column(colIndex).header());
+                            const indicator = header.find('.sort-indicator i');
+                            indicator.removeClass('fa-sort')
+                                .addClass(dir === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+                        }
+                    });
+                }
+            });
+            
+            console.log("Partnership DataTable created successfully");
+            
+        } catch (error) {
+            console.error("Error initializing partnership DataTable:", error);
+        }
     }
     
     updateLastUpdated() {
