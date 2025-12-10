@@ -362,8 +362,8 @@ class SidewindersStats {
             order: [[9, 'desc']], // Default sort by Total Points descending
             pageLength: 25,
             responsive: true,
-            stateSave: true, // Remember sorting/filtering between page refreshes
-            stateDuration: 60 * 60 * 24 * 7, // 1 week
+            stateSave: true,
+            stateDuration: 60 * 60 * 24 * 7,
             language: {
                 search: "Search players:",
                 lengthMenu: "Show _MENU_ entries",
@@ -380,43 +380,48 @@ class SidewindersStats {
                 }
             },
             initComplete: function() {
-                // Add custom sorting indicator
                 const api = this.api();
                 api.columns().every(function() {
                     const column = this;
                     const header = $(column.header());
                     
-                    // Add clickable area for sorting
                     header.css('cursor', 'pointer');
-                    header.attr('title', 'Click to sort');
-                    
-                    // Add sorting indicator
+                    header.attr('title', 'Click to sort (ascending/descending)');
                     header.append('<span class="sort-indicator ms-1"><i class="fas fa-sort"></i></span>');
                     
                     header.on('click', function(e) {
                         if ($(e.target).hasClass('no-sort')) return;
                         
-                        const currentOrder = column.order()[0];
-                        const newOrder = currentOrder[1] === 'asc' ? 'desc' : 'asc';
+                        const currentOrders = api.order();
+                        const columnIndex = column.index();
                         
-                        // Update all indicators
+                        let newOrder = 'asc';
+                        
+                        if (currentOrders.length > 0 && currentOrders[0][0] === columnIndex) {
+                            newOrder = currentOrders[0][1] === 'asc' ? 'desc' : 'asc';
+                        } else {
+                            newOrder = columnIndex === 0 ? 'asc' : 'desc';
+                        }
+                        
                         api.columns().every(function() {
                             $(this.header()).find('.sort-indicator i')
                                 .removeClass('fa-sort-up fa-sort-down')
                                 .addClass('fa-sort');
                         });
                         
-                        // Update current column indicator
                         const indicator = header.find('.sort-indicator i');
                         indicator.removeClass('fa-sort')
                             .addClass(newOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
                         
-                        // Perform sort
-                        api.order([column.index(), newOrder]).draw();
+                        api.order([[columnIndex, newOrder]]).draw();
+                        
+                        $('.sort-btn').removeClass('active');
+                        if (columnIndex === 9) {
+                            $('.sort-btn[data-sort="9"]').addClass('active');
+                        }
                     });
                 });
                 
-                // Update indicator for initial sort
                 const initialColumn = api.order()[0];
                 if (initialColumn) {
                     const header = $(api.column(initialColumn[0]).header());
@@ -427,7 +432,6 @@ class SidewindersStats {
             }
         });
         
-        // Add click handler for player names
         $('#leagueTable tbody').on('click', 'td:first-child', (event) => {
             const playerName = $(event.target).text().trim();
             if (playerName && this.players.includes(playerName)) {
@@ -438,12 +442,10 @@ class SidewindersStats {
             }
         });
         
-        // Add quick sort buttons
         this.addQuickSortButtons();
     }
     
     addQuickSortButtons() {
-        // Remove existing sort buttons if any
         $('#quickSortButtons').remove();
         
         const quickSortHtml = `
@@ -474,7 +476,6 @@ class SidewindersStats {
         
         $('#leagueTable_wrapper').prepend(quickSortHtml);
         
-        // Add click handlers for quick sort buttons
         $('.sort-btn').on('click', (e) => {
             const button = $(e.currentTarget);
             const columnIndex = parseInt(button.data('sort'));
@@ -482,14 +483,11 @@ class SidewindersStats {
             
             const table = $('#leagueTable').DataTable();
             
-            // Update all indicators
             $('.sort-btn').removeClass('active');
             button.addClass('active');
             
-            // Perform sort
             table.order([columnIndex, order]).draw();
             
-            // Update header indicators
             const api = table.api();
             api.columns().every(function() {
                 $(this.header()).find('.sort-indicator i')
@@ -503,15 +501,13 @@ class SidewindersStats {
                 .addClass(order === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
         });
         
-        // Set initial active button (Points)
         $('.sort-btn[data-sort="9"]').addClass('active');
     }
     
     resetSorting() {
         const table = $('#leagueTable').DataTable();
-        table.order([[9, 'desc']]).draw(); // Reset to Total Points descending
+        table.order([[9, 'desc']]).draw();
         
-        // Update indicators
         const api = table.api();
         api.columns().every(function() {
             $(this.header()).find('.sort-indicator i')
@@ -519,368 +515,13 @@ class SidewindersStats {
                 .addClass('fa-sort');
         });
         
-        // Update the Total Points column indicator
         const header = $(api.column(9).header());
         const indicator = header.find('.sort-indicator i');
         indicator.removeClass('fa-sort').addClass('fa-sort-down');
         
-        // Update quick sort buttons
         $('.sort-btn').removeClass('active');
         $('.sort-btn[data-sort="9"]').addClass('active');
     }
     
-    initPartnershipTable(data) {
-        // Destroy existing DataTable if it exists
-        if ($.fn.DataTable.isDataTable('#partnershipTable')) {
-            $('#partnershipTable').DataTable().destroy();
-            $('#partnershipTable tbody').empty();
-        }
-        
-        // If no data, don't initialize DataTable
-        if (!data || data.length === 0) {
-            return;
-        }
-        
-        // Initialize DataTable
-        const table = $('#partnershipTable').DataTable({
-            paging: false,
-            searching: false,
-            info: false,
-            ordering: true,
-            order: [[1, 'desc']], // Default sort by Games Together descending
-            responsive: true,
-            language: {
-                emptyTable: "No partnership data available",
-                zeroRecords: "No matching partnerships found"
-            },
-            columnDefs: [
-                {
-                    targets: 0,
-                    orderable: true,
-                    type: 'string'
-                },
-                {
-                    targets: [1, 2, 3, 4, 5],
-                    orderable: true,
-                    type: 'num'
-                }
-            ],
-            initComplete: function() {
-                // Add sorting indicators
-                const api = this.api();
-                api.columns().every(function() {
-                    const column = this;
-                    const header = $(column.header());
-                    
-                    header.css('cursor', 'pointer');
-                    header.attr('title', 'Click to sort');
-                    header.append('<span class="sort-indicator ms-1"><i class="fas fa-sort"></i></span>');
-                    
-                    header.on('click', function(e) {
-                        const currentOrder = column.order()[0];
-                        const newOrder = currentOrder[1] === 'asc' ? 'desc' : 'asc';
-                        
-                        // Update all indicators
-                        api.columns().every(function() {
-                            $(this.header()).find('.sort-indicator i')
-                                .removeClass('fa-sort-up fa-sort-down')
-                                .addClass('fa-sort');
-                        });
-                        
-                        // Update current column indicator
-                        const indicator = header.find('.sort-indicator i');
-                        indicator.removeClass('fa-sort')
-                            .addClass(newOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
-                        
-                        api.order([column.index(), newOrder]).draw();
-                    });
-                });
-                
-                // Update initial sort indicator
-                const initialColumn = api.order()[0];
-                if (initialColumn) {
-                    const header = $(api.column(initialColumn[0]).header());
-                    const indicator = header.find('.sort-indicator i');
-                    indicator.removeClass('fa-sort')
-                        .addClass(initialColumn[1] === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
-                }
-            }
-        });
-    }
-    
-    initPlayerSelector() {
-        const select = $('#playerSelect');
-        select.empty();
-        select.append('<option value="">Choose a player...</option>');
-        
-        this.players.forEach(player => {
-            select.append(`<option value="${player}">${player}</option>`);
-        });
-        
-        select.off('change').on('change', (e) => {
-            const player = e.target.value;
-            if (player) {
-                this.selectPlayer(player);
-            }
-        });
-    }
-    
-    selectPlayer(playerName) {
-        this.selectedPlayer = playerName;
-        $('#playerSelect').val(playerName);
-        this.showPlayerAnalysis(playerName);
-    }
-    
-    showPlayerAnalysis(playerName) {
-        $('#playerName').text(playerName);
-        
-        const playerStats = this.leagueTable.find(row => row.Player === playerName);
-        
-        if (playerStats) {
-            $('#totalGames').text(playerStats.Games);
-            $('#totalWins').text(playerStats.Wins);
-            $('#totalDraws').text(playerStats.Draws);
-            $('#totalLosses').text(playerStats.Losses);
-            $('#totalPoints').text(playerStats.TotalPoints);
-            $('#totalGoals').text(playerStats.Goals);
-            $('#totalAssists').text(playerStats.Assists);
-            $('#totalOwnGoals').text(playerStats.OwnGoals);
-            $('#totalPenalties').text(playerStats.Penalties);
-            
-            // Calculate Goal Contributions (Goals + Assists, excluding Own Goals)
-            const goalContributions = playerStats.Goals + playerStats.Assists;
-            $('#goalContributions').text(goalContributions);
-            
-            // Calculate win percentage
-            $('#winPercent').text(playerStats.WinPercent + '%');
-            $('#winPercentBar').css('width', playerStats.WinPercent + '%');
-        }
-        
-        $('#playerStats').show();
-        $('#shareButton').prop('disabled', false);
-        this.showPartnershipAnalysis(playerName);
-    }
-    
-    showPartnershipAnalysis(selectedPlayer) {
-        const analysisData = [];
-        
-        this.players.forEach(otherPlayer => {
-            if (otherPlayer === selectedPlayer) return;
-            
-            const selectedGames = this.gameLog.filter(game => game['Player'] === selectedPlayer);
-            const otherGames = this.gameLog.filter(game => game['Player'] === otherPlayer);
-            
-            let gamesInCommon = 0;
-            let sameTeamGames = 0;
-            let winTogether = 0;
-            let oppositeTeamGames = 0;
-            let selectedWinsVsOther = 0;
-            
-            const selectedGameMap = {};
-            selectedGames.forEach(game => {
-                const key = game['ID'] + '|' + game['Team'];
-                selectedGameMap[key] = game;
-            });
-            
-            const otherGameMap = {};
-            otherGames.forEach(game => {
-                const key = game['ID'] + '|' + game['Team'];
-                otherGameMap[key] = game;
-            });
-            
-            Object.keys(selectedGameMap).forEach(key => {
-                if (otherGameMap[key]) {
-                    gamesInCommon++;
-                    sameTeamGames++;
-                    
-                    if (selectedGameMap[key]['Result'] === 'Win') {
-                        winTogether++;
-                    }
-                }
-            });
-            
-            selectedGames.forEach(sGame => {
-                otherGames.forEach(oGame => {
-                    if (sGame['ID'] === oGame['ID'] && sGame['Team'] !== oGame['Team']) {
-                        gamesInCommon++;
-                        oppositeTeamGames++;
-                        
-                        if (sGame['Result'] === 'Win') {
-                            selectedWinsVsOther++;
-                        }
-                    }
-                });
-            });
-            
-            if (gamesInCommon > 0) {
-                const winPercentTogether = sameTeamGames > 0 ? 
-                    Math.round((winTogether / sameTeamGames) * 100) : 0;
-                
-                const h2hWinPercent = oppositeTeamGames > 0 ? 
-                    Math.round((selectedWinsVsOther / oppositeTeamGames) * 100) : 0;
-                
-                analysisData.push({
-                    player: otherPlayer,
-                    gamesInCommon: gamesInCommon,
-                    sameTeam: sameTeamGames,
-                    oppositeTeam: oppositeTeamGames,
-                    winTogether: winTogether,
-                    winPercentTogether: winPercentTogether,
-                    h2hWinPercent: h2hWinPercent
-                });
-            }
-        });
-        
-        analysisData.sort((a, b) => {
-            if (b.gamesInCommon !== a.gamesInCommon) {
-                return b.gamesInCommon - a.gamesInCommon;
-            }
-            return b.winPercentTogether - a.winPercentTogether;
-        });
-        
-        const tableBody = $('#partnershipTable tbody');
-        tableBody.empty();
-        
-        if (analysisData.length === 0) {
-            tableBody.append(`
-                <tr>
-                    <td colspan="6" class="text-center text-muted">
-                        No partnership data available for this player
-                    </td>
-                </tr>
-            `);
-            this.initPartnershipTable([]); // Initialize empty DataTable
-            return;
-        }
-        
-        analysisData.forEach(data => {
-            const winTogetherClass = data.winPercentTogether >= 60 ? 'table-success-light' :
-                                   data.winPercentTogether <= 30 ? 'table-danger-light' : '';
-            
-            const h2hClass = data.h2hWinPercent >= 60 ? 'table-success-light' :
-                           data.h2hWinPercent <= 30 && data.oppositeTeam > 0 ? 'table-danger-light' : '';
-            
-            const row = `
-                <tr>
-                    <td class="fw-bold clickable-player" onclick="window.sidewindersApp.selectPlayer('${data.player.replace(/'/g, "\\'")}')">
-                        ${data.player}
-                    </td>
-                    <td class="text-center" data-order="${data.gamesInCommon}">${data.gamesInCommon}</td>
-                    <td class="text-center" data-order="${data.sameTeam}">${data.sameTeam}</td>
-                    <td class="text-center" data-order="${data.oppositeTeam}">${data.oppositeTeam > 0 ? data.oppositeTeam : '-'}</td>
-                    <td class="text-center ${winTogetherClass}" data-order="${data.winPercentTogether}">
-                        ${data.sameTeam > 0 ? data.winPercentTogether + '%' : '-'}
-                    </td>
-                    <td class="text-center ${h2hClass}" data-order="${data.h2hWinPercent}">
-                        ${data.oppositeTeam > 0 ? data.h2hWinPercent + '%' : '-'}
-                    </td>
-                </tr>
-            `;
-            tableBody.append(row);
-        });
-        
-        // Initialize DataTable for partnership table
-        this.initPartnershipTable(analysisData);
-    }
-    
-    updateLastUpdated() {
-        fetch('GameLog.csv', { method: 'HEAD' })
-            .then(response => {
-                const lastModified = response.headers.get('last-modified');
-                if (lastModified) {
-                    const date = new Date(lastModified);
-                    $('#lastUpdated').text(date.toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    }));
-                } else {
-                    const now = new Date();
-                    $('#lastUpdated').text(now.toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                    }));
-                }
-            })
-            .catch(() => {
-                const now = new Date();
-                $('#lastUpdated').text(now.toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                }));
-            });
-    }
-    
-    showLoading(show) {
-        if (show) {
-            $('#loadingIndicator').show();
-        } else {
-            $('#loadingIndicator').hide();
-        }
-    }
-    
-    showError(message) {
-        const errorHtml = `
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <strong>Error:</strong> ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        `;
-        $('.container').prepend(errorHtml);
-    }
-}
-
-// Initialize the application
-document.addEventListener('DOMContentLoaded', function() {
-    window.sidewindersApp = new SidewindersStats();
-    
-    $('a[href="#league"]').click(function(e) {
-        e.preventDefault();
-        $('html, body').animate({
-            scrollTop: $('#league').offset().top - 20
-        }, 500);
-    });
-    
-    $('a[href="#analysis"]').click(function(e) {
-        e.preventDefault();
-        $('html, body').animate({
-            scrollTop: $('#analysis').offset().top - 20
-        }, 500);
-    });
-});
-
-function shareCurrentPlayer() {
-    const playerSelect = document.getElementById('playerSelect');
-    const playerName = playerSelect.value;
-    
-    if (!playerName) {
-        alert('Please select a player first.');
-        return;
-    }
-    
-    const url = new URL(window.location.href);
-    url.hash = `player-${encodeURIComponent(playerName)}`;
-    
-    navigator.clipboard.writeText(url.toString())
-        .then(() => {
-            const toast = `<div class="toast show position-fixed bottom-0 end-0 m-3" role="alert">
-                <div class="toast-header bg-success text-white">
-                    <strong class="me-auto">Success!</strong>
-                    <button type="button" class="btn-close btn-close-white" onclick="this.parentElement.parentElement.remove()"></button>
-                </div>
-                <div class="toast-body">
-                    Link to ${playerName}'s analysis copied to clipboard!
-                </div>
-            </div>`;
-            $('body').append(toast);
-            setTimeout(() => $('.toast').remove(), 3000);
-        })
-        .catch(err => {
-            console.error('Failed to copy:', err);
-            alert('Failed to copy link. You can manually copy the URL from your browser.');
-        });
-}
+    clearPartnershipTable() {
+        const table = $('#partnershipTable').DataTable();
