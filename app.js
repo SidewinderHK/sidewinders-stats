@@ -489,7 +489,21 @@ class SidewindersStats {
             $('.sort-btn').removeClass('active');
             button.addClass('active');
             
+            // Apply the sort
             table.order([columnIndex, order]).draw();
+            
+            // Update indicators directly
+            const api = table;
+            api.columns().every(function() {
+                $(this.header()).find('.sort-indicator i')
+                    .removeClass('fa-sort-up fa-sort-down')
+                    .addClass('fa-sort');
+            });
+            
+            const header = $(api.column(columnIndex).header());
+            const indicator = header.find('.sort-indicator i');
+            indicator.removeClass('fa-sort')
+                .addClass(order === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
         });
         
         $('.sort-btn[data-sort="9"]').addClass('active');
