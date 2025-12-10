@@ -525,3 +525,335 @@ class SidewindersStats {
     
     clearPartnershipTable() {
         const table = $('#partnershipTable').DataTable();
+        if (table) {
+            table.clear().draw();
+        }
+    }
+    
+    initPartnershipTable(data) {
+        if ($.fn.DataTable.isDataTable('#partnershipTable')) {
+            $('#partnershipTable').DataTable().destroy();
+            $('#partnershipTable tbody').empty();
+        }
+        
+        if (!data || data.length === 0) {
+            return;
+        }
+        
+        const table = $('#partnershipTable').DataTable({
+            paging: false,
+            searching: false,
+            info: false,
+            ordering: true,
+            order: [[1, 'desc']],
+            responsive: true,
+            language: {
+                emptyTable: "No partnership data available",
+                zeroRecords: "No matching partnerships found"
+            },
+            columnDefs: [
+                {
+                    targets: 0,
+                    orderable: true,
+                    type: 'string'
+                },
+                {
+                    targets: [1, 2, 3, 4, 5],
+                    orderable: true,
+                    type: 'num'
+                }
+            ],
+            initComplete: function() {
+                const api = this.api();
+                api.columns().every(function() {
+                    const column = this;
+                    const header = $(column.header());
+                    
+                    header.css('cursor', 'pointer');
+                    header.attr('title', 'Click to sort (ascending/descending)');
+                    header.append('<span class="sort-indicator ms-1"><i class="fas fa-sort"></i></span>');
+                    
+                    header.on('click', function(e) {
+                        const currentOrders = api.order();
+                        const columnIndex = column.index();
+                        
+                        let newOrder = 'asc';
+                        
+                        if (currentOrders.length > 0 && currentOrders[0][0] === columnIndex) {
+                            newOrder = currentOrders[0][1] === 'asc' ? 'desc' : 'asc';
+                        } else {
+                            newOrder = columnIndex === 0 ? 'asc' : 'desc';
+                        }
+                        
+                        api.columns().every(function() {
+                            $(this.header()).find('.sort-indicator i')
+                                .removeClass('fa-sort-up fa-sort-down')
+                                .addClass('fa-sort');
+                        });
+                        
+                        const indicator = header.find('.sort-indicator i');
+                        indicator.removeClass('fa-sort')
+                            .addClass(newOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+                        
+                        api.order([[columnIndex, newOrder]]).draw();
+                    });
+                });
+                
+                const initialColumn = api.order()[0];
+                if (initialColumn) {
+                    const header = $(api.column(initialColumn[0]).header());
+                    const indicator = header.find('.sort-indicator i');
+                    indicator.removeClass('fa-sort')
+                        .addClass(initialColumn[1] === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+                }
+            }
+        });
+    }
+    
+    initPlayerSelector() {
+        const select = $('#playerSelect');
+        select.empty();
+        select.append('<option value="">Choose a player...</option>');
+        
+        this.players.forEach(player => {
+            select.append(`<option value="${player}">${player}</option>`);
+        });
+        
+        select.off('change').on('change', (e) => {
+            const player = e.target.value;
+            if (player) {
+                this.selectPlayer(player);
+            }
+        });
+    }
+    
+    selectPlayer(playerName) {
+        this.selectedPlayer = playerName;
+        $('#playerSelect').val(playerName);
+        this.showPlayerAnalysis(playerName);
+    }
+    
+    showPlayerAnalysis(playerName) {
+        $('#playerName').text(playerName);
+        
+        const playerStats = this.leagueTable.find(row => row.Player === playerName);
+        
+        if (playerStats) {
+            $('#totalGames').text(playerStats.Games);
+            $('#totalWins').text(playerStats.Wins);
+            $('#totalDraws').text(playerStats.Draws);
+            $('#totalLosses').text(playerStats.Losses);
+            $('#totalPoints').text(playerStats.TotalPoints);
+            $('#totalGoals').text(playerStats.Goals);
+            $('#totalAssists').text(playerStats.Assists);
+            $('#totalOwnGoals').text(playerStats.OwnGoals);
+            $('#totalPenalties').text(playerStats.Penalties);
+            
+            const goalContributions = playerStats.Goals + playerStats.Assists;
+            $('#goalContributions').text(goalContributions);
+            
+            $('#winPercent').text(playerStats.WinPercent + '%');
+            $('#winPercentBar').css('width', playerStats.WinPercent + '%');
+        }
+        
+        $('#playerStats').show();
+        $('#shareButton').prop('disabled', false);
+        
+        this.clearPartnershipTable();
+        
+        const tableBody = $('#partnershipTable tbody');
+        tableBody.html(`
+            <tr>
+                <td colspan="6" class="text-center">
+                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                    Loading partnership data...
+                </td>
+            </tr>
+        `);
+        
+        setTimeout(() => {
+            this.showPartnershipAnalysis(playerName);
+        }, 100);
+    }
+    
+    showPartnershipAnalysis(selectedPlayer) {
+        const analysisData = [];
+        
+        this.players.forEach(otherPlayer => {
+            if (otherPlayer === selectedPlayer) return;
+            
+            const selectedGames = this.gameLog.filter(game => game['Player'] === selectedPlayer);
+            const otherGames = this.gameLog.filter(game => game['Player'] === otherPlayer);
+            
+            let gamesInCommon = 0;
+            let sameTeamGames = 0;
+            let winTogether = 0;
+            let oppositeTeamGames = 0;
+            let selectedWinsVsOther = 0;
+            
+            const selectedGameMap = {};
+            selectedGames.forEach(game => {
+                const key = game['ID'] + '|' + game['Team'];
+                selectedGameMap[key] = game;
+            });
+            
+            const otherGameMap = {};
+            otherGames.forEach(game => {
+                const key = game['ID'] + '|' + game['Team'];
+                otherGameMap[key] = game;
+            });
+            
+            Object.keys(selectedGameMap).forEach(key => {
+                if (otherGameMap[key]) {
+                    gamesInCommon++;
+                    sameTeamGames++;
+                    
+                    if (selectedGameMap[key]['Result'] === 'Win') {
+                        winTogether++;
+                    }
+                }
+            });
+            
+            selectedGames.forEach(sGame => {
+                otherGames.forEach(oGame => {
+                    if (sGame['ID'] === oGame['ID'] && sGame['Team'] !== oGame['Team']) {
+                        gamesInCommon++;
+                        oppositeTeamGames++;
+                        
+                        if (sGame['Result'] === 'Win') {
+                            selectedWinsVsOther++;
+                        }
+                    }
+                });
+            });
+            
+            if (gamesInCommon > 0) {
+                const winPercentTogether = sameTeamGames > 0 ? 
+                    Math.round((winTogether / sameTeamGames) * 100) : 0;
+                
+                const h2hWinPercent = oppositeTeamGames > 0 ? 
+                    Math.round((selectedWinsVsOther / oppositeTeamGames) * 100) : 0;
+                
+                analysisData.push({
+                    player: otherPlayer,
+                    gamesInCommon: gamesInCommon,
+                    sameTeam: sameTeamGames,
+                    oppositeTeam: oppositeTeamGames,
+                    winTogether: winTogether,
+                    winPercentTogether: winPercentTogether,
+                    h2hWinPercent: h2hWinPercent
+                });
+            }
+        });
+        
+        analysisData.sort((a, b) => {
+            if (b.gamesInCommon !== a.gamesInCommon) {
+                return b.gamesInCommon - a.gamesInCommon;
+            }
+            return b.winPercentTogether - a.winPercentTogether;
+        });
+        
+        this.initPartnershipTable(analysisData);
+    }
+    
+    updateLastUpdated() {
+        fetch('GameLog.csv', { method: 'HEAD' })
+            .then(response => {
+                const lastModified = response.headers.get('last-modified');
+                if (lastModified) {
+                    const date = new Date(lastModified);
+                    $('#lastUpdated').text(date.toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    }));
+                } else {
+                    const now = new Date();
+                    $('#lastUpdated').text(now.toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    }));
+                }
+            })
+            .catch(() => {
+                const now = new Date();
+                $('#lastUpdated').text(now.toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                }));
+            });
+    }
+    
+    showLoading(show) {
+        if (show) {
+            $('#loadingIndicator').show();
+        } else {
+            $('#loadingIndicator').hide();
+        }
+    }
+    
+    showError(message) {
+        const errorHtml = `
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <strong>Error:</strong> ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        $('.container').prepend(errorHtml);
+    }
+}
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', function() {
+    window.sidewindersApp = new SidewindersStats();
+    
+    $('a[href="#league"]').click(function(e) {
+        e.preventDefault();
+        $('html, body').animate({
+            scrollTop: $('#league').offset().top - 20
+        }, 500);
+    });
+    
+    $('a[href="#analysis"]').click(function(e) {
+        e.preventDefault();
+        $('html, body').animate({
+            scrollTop: $('#analysis').offset().top - 20
+        }, 500);
+    });
+});
+
+function shareCurrentPlayer() {
+    const playerSelect = document.getElementById('playerSelect');
+    const playerName = playerSelect.value;
+    
+    if (!playerName) {
+        alert('Please select a player first.');
+        return;
+    }
+    
+    const url = new URL(window.location.href);
+    url.hash = `player-${encodeURIComponent(playerName)}`;
+    
+    navigator.clipboard.writeText(url.toString())
+        .then(() => {
+            const toast = `<div class="toast show position-fixed bottom-0 end-0 m-3" role="alert">
+                <div class="toast-header bg-success text-white">
+                    <strong class="me-auto">Success!</strong>
+                    <button type="button" class="btn-close btn-close-white" onclick="this.parentElement.parentElement.remove()"></button>
+                </div>
+                <div class="toast-body">
+                    Link to ${playerName}'s analysis copied to clipboard!
+                </div>
+            </div>`;
+            $('body').append(toast);
+            setTimeout(() => $('.toast').remove(), 3000);
+        })
+        .catch(err => {
+            console.error('Failed to copy:', err);
+            alert('Failed to copy link. You can manually copy the URL from your browser.');
+        });
+}
