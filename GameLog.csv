@@ -107,7 +107,7 @@ ID,Date,Player,Team,Result,Gls,OG,Ast,Pen,Column 1
 5,04/10/2025,Sam,Colour,Draw,1,,,,
 5,04/10/2025,Moh,Colour,Draw,1,,1,,
 5,04/10/2025,Adi,Colour,Draw,,,1,,
-6,11/10/2025,Shen,White,Losa,,,,,
+6,11/10/2025,Shen,White,Loss,,,,,
 6,11/10/2025,Tony,White,Loss,,,,,
 6,11/10/2025,Weiyu,White,Loss,,,,,
 6,11/10/2025,Ron,White,Loss,,,,,
@@ -435,4 +435,5 @@ ID,Date,Player,Team,Result,Gls,OG,Ast,Pen,Column 1
 20,17/01/2026,Karthik,Colour,Win,,,2,,
 20,17/01/2026,John,Colour,Win,,,,,
 20,17/01/2026,ArnaudD,Colour,Win,2,,3,,
+
 20,17/01/2026,ArnaudK,Colour,Win,,,,,
