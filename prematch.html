@@ -239,21 +239,27 @@
         // Load data from URL parameters on page load
         function loadFromURL() {
             const urlParams = new URLSearchParams(window.location.search);
-            const whiteTeam = urlParams.get('white');
-            const colourTeam = urlParams.get('colour');
+            const whiteTeamEncoded = urlParams.get('white');
+            const colourTeamEncoded = urlParams.get('colour');
             
-            if (whiteTeam) {
-                const players = whiteTeam.split(',');
+            if (whiteTeamEncoded) {
+                // Decode the URL parameter
+                const whiteTeamDecoded = decodeURIComponent(whiteTeamEncoded);
+                // Split by comma and join with newlines
+                const players = whiteTeamDecoded.split(',');
                 document.getElementById('whiteTeamPlayers').value = players.join('\n');
             }
             
-            if (colourTeam) {
-                const players = colourTeam.split(',');
+            if (colourTeamEncoded) {
+                // Decode the URL parameter
+                const colourTeamDecoded = decodeURIComponent(colourTeamEncoded);
+                // Split by comma and join with newlines
+                const players = colourTeamDecoded.split(',');
                 document.getElementById('colourTeamPlayers').value = players.join('\n');
             }
             
             // Auto-analyze if both teams are provided
-            if (whiteTeam && colourTeam && dataLoaded) {
+            if (whiteTeamEncoded && colourTeamEncoded && dataLoaded) {
                 setTimeout(() => {
                     analyzeMatchup();
                 }, 500);
@@ -273,6 +279,7 @@
                 return null;
             }
             
+            // Join with commas and then encode
             const whiteParam = encodeURIComponent(whiteTeam.join(','));
             const colourParam = encodeURIComponent(colourTeam.join(','));
             
