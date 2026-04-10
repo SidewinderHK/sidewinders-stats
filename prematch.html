@@ -179,6 +179,39 @@
             }
         }
         
+        .key-factors, .head-to-head, .insights {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+        }
+        
+        .team-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 10px;
+            height: 100%;
+        }
+        
+        .team-card h4 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .stat {
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .player-highlight {
+            padding: 10px;
+            margin: 5px;
+            background: white;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
         @media (max-width: 768px) {
             .vs-circle {
                 margin: 15px auto;
@@ -243,22 +276,17 @@
             const colourTeamEncoded = urlParams.get('colour');
             
             if (whiteTeamEncoded) {
-                // Decode the URL parameter
                 const whiteTeamDecoded = decodeURIComponent(whiteTeamEncoded);
-                // Split by comma and join with newlines
                 const players = whiteTeamDecoded.split(',');
                 document.getElementById('whiteTeamPlayers').value = players.join('\n');
             }
             
             if (colourTeamEncoded) {
-                // Decode the URL parameter
                 const colourTeamDecoded = decodeURIComponent(colourTeamEncoded);
-                // Split by comma and join with newlines
                 const players = colourTeamDecoded.split(',');
                 document.getElementById('colourTeamPlayers').value = players.join('\n');
             }
             
-            // Auto-analyze if both teams are provided
             if (whiteTeamEncoded && colourTeamEncoded && dataLoaded) {
                 setTimeout(() => {
                     analyzeMatchup();
@@ -279,7 +307,6 @@
                 return null;
             }
             
-            // Join with commas and then encode
             const whiteParam = encodeURIComponent(whiteTeam.join(','));
             const colourParam = encodeURIComponent(colourTeam.join(','));
             
@@ -300,7 +327,6 @@
                 showToast("✓ Shareable link copied to clipboard!");
             } catch (err) {
                 console.error('Failed to copy:', err);
-                // Fallback
                 prompt("Copy this link to share:", url);
             }
         }
@@ -321,7 +347,6 @@
         async function loadData() {
             console.log("Checking for existing app data...");
             
-            // Try to get data from the main app
             if (window.sidewindersApp && window.sidewindersApp.gameLog && window.sidewindersApp.gameLog.length > 0) {
                 console.log("✓ Using data from main app");
                 const gameLog = window.sidewindersApp.gameLog;
@@ -329,11 +354,10 @@
                 analyzer = new PreMatchAnalyzer(gameLog, leagueTable);
                 dataLoaded = true;
                 document.querySelector('.btn-analyze').disabled = false;
-                loadFromURL(); // Check URL params after data is loaded
+                loadFromURL();
                 return true;
             }
             
-            // Fallback: Load CSV directly
             console.log("Loading CSV directly...");
             try {
                 const response = await fetch('GameLog.csv');
@@ -353,7 +377,7 @@
                 dataLoaded = true;
                 document.querySelector('.btn-analyze').disabled = false;
                 console.log(`✓ Loaded ${gameLog.length} games, ${leagueTable.length} players`);
-                loadFromURL(); // Check URL params after data is loaded
+                loadFromURL();
                 return true;
                 
             } catch (error) {
@@ -441,7 +465,7 @@
                         <h5><i class="fas fa-exclamation-triangle"></i> Error Loading Data</h5>
                         <p>${message}</p>
                         <hr>
-                        <p><strong>Troubleshooting for GitHub Pages:</strong></p>
+                        <p><strong>Troubleshooting:</strong></p>
                         <ul>
                             <li>Make sure <code>GameLog.csv</code> is in the <strong>same folder</strong> as this HTML file</li>
                             <li>Check the filename capitalization - it must be exactly <code>GameLog.csv</code></li>
@@ -474,7 +498,6 @@
                 return;
             }
             
-            // Show loading
             document.getElementById('results').style.display = 'block';
             document.getElementById('results').innerHTML = `
                 <div class="analysis-card">
@@ -487,44 +510,14 @@
             
             document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
             
-            // Perform analysis
             setTimeout(() => {
                 try {
-                    const analysis = analyzer.analyzeTeams(whiteTeam, colourTeam);
+                    // Pass team names directly to analyzeTeams
+                    const analysis = analyzer.analyzeTeams(whiteTeam, colourTeam, "White Team", "Colour Team");
                     
-                    // Override team names in prediction key factors (replace "Team 1" and "Team 2")
-                    if (analysis.prediction && analysis.prediction.keyFactors) {
-                        analysis.prediction.keyFactors = analysis.prediction.keyFactors.map(factor => 
-                            factor.replace(/Team 1/g, 'White Team').replace(/Team 2/g, 'Colour Team')
-                        );
-                    }
-                    
-                    // Override the predicted winner
-                    if (analysis.prediction) {
-                        analysis.prediction.predictedWinner = analysis.prediction.predictedWinner === "Team 1" ? "White Team" : "Colour Team";
-                    }
-                    
-                    // Override team names in head-to-head stats if they exist
-                    if (analysis.headToHead) {
-                        // The head-to-head object doesn't have team names directly, but we can add them for display
-                        analysis.headToHead.team1Name = "White Team";
-                        analysis.headToHead.team2Name = "Colour Team";
-                    }
-                    
-                    // Override team names in the teams themselves
-                    analysis.team1.name = "White Team";
-                    analysis.team2.name = "Colour Team";
-                    
-                    // Also override any "Team 1" or "Team 2" in insights
-                    if (analysis.insights) {
-                        analysis.insights = analysis.insights.map(insight => 
-                            insight.replace(/Team 1/g, 'White Team').replace(/Team 2/g, 'Colour Team')
-                        );
-                    }
-                    
+                    // Generate HTML report (the prematch.js now handles all the display)
                     const html = analyzer.generateHTMLReport(analysis);
                     
-                    // Add share button to the results
                     const shareSection = `
                         <div class="share-section">
                             <button class="btn-share" onclick="shareAnalysis()">
@@ -538,7 +531,6 @@
                     
                     document.getElementById('results').innerHTML = html + shareSection;
                     
-                    // Update URL without reloading page
                     const url = generateShareableUrl();
                     if (url) {
                         window.history.pushState({}, '', url);
@@ -550,6 +542,11 @@
                         <div class="analysis-card">
                             <div class="alert alert-danger">
                                 Error during analysis: ${error.message}
+                                <br><br>
+                                <details>
+                                    <summary>Technical Details</summary>
+                                    <pre class="mt-2">${error.stack}</pre>
+                                </details>
                             </div>
                         </div>
                     `;
@@ -557,7 +554,6 @@
             }, 100);
         }
         
-        // Initialize
         loadData();
     </script>
 </body>
