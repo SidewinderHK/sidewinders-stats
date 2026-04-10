@@ -5,7 +5,7 @@ class PreMatchAnalyzer {
         this.leagueTable = leagueTable;
         this.playerStats = {};
         this.playerPairs = {};
-        this.playerHeadToHead = {}; // New: Track player vs player stats
+        this.playerHeadToHead = {};
         this.init();
     }
     
@@ -19,7 +19,6 @@ class PreMatchAnalyzer {
     calculatePlayerStats() {
         console.log("Calculating player statistics...");
         
-        // First, load existing league table data for reliable base stats
         if (this.leagueTable && this.leagueTable.length > 0) {
             this.leagueTable.forEach(player => {
                 this.playerStats[player.Player] = {
@@ -44,7 +43,6 @@ class PreMatchAnalyzer {
             });
         }
         
-        // Supplement with detailed game-by-game data for form and synergies
         this.gameLog.forEach(game => {
             const player = game['Player'];
             if (!player) return;
@@ -73,7 +71,6 @@ class PreMatchAnalyzer {
             
             const stats = this.playerStats[player];
             
-            // Track last 5 games for form (regardless of existing data)
             if (stats.last5Games.length >= 5) {
                 stats.last5Games.shift();
             }
@@ -88,18 +85,15 @@ class PreMatchAnalyzer {
                 points: points,
                 goals: parseInt(game['Gls']) || 0,
                 assists: parseInt(game['Ast']) || 0,
-                date: game['Date'],
-                team: game['Team'],
-                opponent: null // Will be filled later
+                date: game['Date']
             });
         });
         
-        // Calculate form ratings with minimum games requirement
         Object.values(this.playerStats).forEach(stats => {
             const validGames = stats.last5Games.filter(g => g !== undefined);
             const gamesPlayed = validGames.length;
             
-            if (gamesPlayed >= 3) {  // Minimum 3 games for form rating
+            if (gamesPlayed >= 3) {
                 const formPoints = validGames.reduce((sum, g) => sum + g.points, 0);
                 const maxPoints = gamesPlayed * 3;
                 stats.formRating = (formPoints / maxPoints * 100).toFixed(1);
@@ -107,19 +101,17 @@ class PreMatchAnalyzer {
                 stats.formAssists = validGames.reduce((sum, g) => sum + g.assists, 0);
                 stats.formGames = gamesPlayed;
             } else {
-                stats.formRating = null;  // Not enough games for reliable form
+                stats.formRating = null;
                 stats.formGoals = 0;
                 stats.formAssists = 0;
                 stats.formGames = gamesPlayed;
             }
             
-            // Calculate weighted reliability score
             stats.reliability = Math.min(1, (stats.games / 30) * 0.7 + (stats.last5Games.length / 5) * 0.3);
             
-            // Calculate player impact score (only for players with 5+ games)
             if (stats.games >= 5) {
                 stats.impactScore = (
-                    (stats.ppg * 0.4) +
+                    (parseFloat(stats.ppg) * 0.4) +
                     (stats.goalsPerGame * 15) +
                     (stats.assistsPerGame * 10) +
                     (stats.reliability * 20)
@@ -133,7 +125,6 @@ class PreMatchAnalyzer {
     calculatePlayerHeadToHead() {
         console.log("Calculating player head-to-head statistics...");
         
-        // Group games by match ID
         const games = {};
         
         this.gameLog.forEach(game => {
@@ -159,7 +150,6 @@ class PreMatchAnalyzer {
             games[gameId].teams[team].goals += parseInt(game['Gls']) || 0;
         });
         
-        // Analyze each game for player matchups
         Object.values(games).forEach(game => {
             const teams = Object.values(game.teams);
             if (teams.length === 2) {
@@ -168,7 +158,6 @@ class PreMatchAnalyzer {
                 const team1Result = teams[0].result;
                 const team2Result = teams[1].result;
                 
-                // For each player in team1, record outcome against each player in team2
                 team1Players.forEach(player1 => {
                     if (!this.playerHeadToHead[player1]) {
                         this.playerHeadToHead[player1] = {};
@@ -202,7 +191,6 @@ class PreMatchAnalyzer {
                     });
                 });
                 
-                // Also track from team2 perspective
                 team2Players.forEach(player2 => {
                     if (!this.playerHeadToHead[player2]) {
                         this.playerHeadToHead[player2] = {};
@@ -238,7 +226,6 @@ class PreMatchAnalyzer {
             }
         });
         
-        // Calculate win percentages for each matchup
         Object.values(this.playerHeadToHead).forEach(playerMatchups => {
             Object.values(playerMatchups).forEach(matchup => {
                 if (matchup.games > 0) {
@@ -252,7 +239,6 @@ class PreMatchAnalyzer {
     calculatePlayerSynergies() {
         console.log("Calculating player synergies...");
         
-        // Track how players perform when playing together
         const gameTeams = {};
         
         this.gameLog.forEach(game => {
@@ -278,7 +264,6 @@ class PreMatchAnalyzer {
             gameTeams[gameId].teams[team].players.push(player);
         });
         
-        // Analyze each game's team compositions
         Object.values(gameTeams).forEach(game => {
             const teams = Object.values(game.teams);
             if (teams.length === 2) {
@@ -287,12 +272,10 @@ class PreMatchAnalyzer {
                 const team1Result = teams[0].result;
                 const team2Result = teams[1].result;
                 
-                // Track pairs within winning team
                 const winningTeam = team1Result === 'Win' ? team1Players : 
                                    (team2Result === 'Win' ? team2Players : null);
                 
                 if (winningTeam) {
-                    // Record synergy for all pairs in winning team
                     for (let i = 0; i < winningTeam.length; i++) {
                         for (let j = i + 1; j < winningTeam.length; j++) {
                             const pairKey = [winningTeam[i], winningTeam[j]].sort().join('|');
@@ -310,7 +293,6 @@ class PreMatchAnalyzer {
                     }
                 }
                 
-                // Also track losses for negative synergy
                 const losingTeam = team1Result === 'Loss' ? team1Players : 
                                   (team2Result === 'Loss' ? team2Players : null);
                 
@@ -327,14 +309,12 @@ class PreMatchAnalyzer {
                                 };
                             }
                             this.playerPairs[pairKey].gamesTogether++;
-                            // Don't increment wins for losses
                         }
                     }
                 }
             }
         });
         
-        // Calculate synergy scores
         Object.values(this.playerPairs).forEach(pair => {
             pair.winRate = pair.gamesTogether > 0 ? 
                 (pair.winsTogether / pair.gamesTogether * 100).toFixed(1) : 0;
@@ -346,25 +326,20 @@ class PreMatchAnalyzer {
     analyzeTeams(team1Players, team2Players, team1Name = "Team 1", team2Name = "Team 2") {
         console.log("Analyzing matchup with", team1Players.length, "vs", team2Players.length, "players");
         
-        // Filter out players with no stats (but still include with default values)
         const team1Stats = team1Players.map(p => this.playerStats[p] || this.createDefaultStats(p));
         const team2Stats = team2Players.map(p => this.playerStats[p] || this.createDefaultStats(p));
         
-        // Calculate weighted team metrics (more reliable players have higher weight)
         const team1Weight = team1Stats.reduce((sum, s) => sum + s.reliability, 0);
         const team2Weight = team2Stats.reduce((sum, s) => sum + s.reliability, 0);
         
         const team1Metrics = this.calculateWeightedMetrics(team1Stats);
         const team2Metrics = this.calculateWeightedMetrics(team2Stats);
         
-        // Calculate synergy within teams
         const team1Synergy = this.calculateTeamSynergy(team1Players);
         const team2Synergy = this.calculateTeamSynergy(team2Players);
         
-        // Calculate player-level head-to-head statistics
         const playerH2HStats = this.calculatePlayerHeadToHeadStats(team1Players, team2Players);
         
-        // Calculate prediction using weighted factors
         const prediction = this.calculatePrediction(
             team1Metrics, team2Metrics, 
             team1Synergy, team2Synergy, 
@@ -373,11 +348,11 @@ class PreMatchAnalyzer {
             team1Name, team2Name
         );
         
-        // Generate insights
         const insights = this.generateInsights(
             team1Stats, team2Stats, 
             team1Synergy, team2Synergy,
-            playerH2HStats
+            playerH2HStats,
+            team1Name, team2Name
         );
         
         return {
@@ -415,18 +390,18 @@ class PreMatchAnalyzer {
             team2Advantage: 0,
             keyMatchups: [],
             team1WinRateVsOpponents: 0,
-            team2WinRateVsOpponents: 0
+            team2WinRateVsOpponents: 0,
+            hasData: false
         };
         
         let totalTeam1Wins = 0;
         let totalTeam2Wins = 0;
         let totalMatchupGames = 0;
         
-        // For each player in team1, check their record against each player in team2
         team1Players.forEach(player1 => {
             team2Players.forEach(player2 => {
                 const matchup = this.playerHeadToHead[player1]?.[player2];
-                if (matchup && matchup.games >= 2) {  // Minimum 2 games for meaningful data
+                if (matchup && matchup.games >= 2) {
                     stats.totalMatchups++;
                     totalMatchupGames += matchup.games;
                     
@@ -436,11 +411,9 @@ class PreMatchAnalyzer {
                         stats.team2Advantage++;
                     }
                     
-                    // Calculate win rate contribution
                     totalTeam1Wins += matchup.wins;
                     totalTeam2Wins += matchup.losses;
                     
-                    // Store key matchups (where one player dominates another)
                     if (matchup.winPercent >= 65 && matchup.games >= 3) {
                         stats.keyMatchups.push({
                             winner: player1,
@@ -466,8 +439,6 @@ class PreMatchAnalyzer {
             stats.team1WinRateVsOpponents = (totalTeam1Wins / totalMatchupGames * 100).toFixed(1);
             stats.team2WinRateVsOpponents = (totalTeam2Wins / totalMatchupGames * 100).toFixed(1);
             stats.hasData = true;
-        } else {
-            stats.hasData = false;
         }
         
         return stats;
@@ -484,13 +455,12 @@ class PreMatchAnalyzer {
         playerStats.forEach(stat => {
             const weight = stat.reliability;
             totalWeight += weight;
-            weightedPPG += stat.ppg * weight;
-            weightedWinPct += stat.winPercent * weight;
+            weightedPPG += parseFloat(stat.ppg) * weight;
+            weightedWinPct += parseFloat(stat.winPercent) * weight;
             weightedGoalsPerGame += stat.goalsPerGame * weight;
             
-            // Only include form if it exists (minimum 3 games)
             if (stat.formRating !== null) {
-                weightedForm += stat.formRating * weight;
+                weightedForm += parseFloat(stat.formRating) * weight;
                 validFormCount++;
             }
         });
@@ -545,37 +515,29 @@ class PreMatchAnalyzer {
     calculatePrediction(team1Metrics, team2Metrics, team1Synergy, team2Synergy, playerH2HStats, team1Weight, team2Weight, team1Name, team2Name) {
         let team1Score = 50;
         
-        // Factor 1: Individual player performance (35% weight)
-        const ppgDiff = (team1Metrics.ppg - team2Metrics.ppg) * 10;
+        const ppgDiff = (parseFloat(team1Metrics.ppg) - parseFloat(team2Metrics.ppg)) * 10;
         team1Score += ppgDiff * 0.35;
         
-        // Factor 2: Current form (25% weight) - only if available
         if (team1Metrics.formRating !== "N/A" && team2Metrics.formRating !== "N/A") {
-            const formDiff = (team1Metrics.formRating - team2Metrics.formRating) * 0.3;
+            const formDiff = (parseFloat(team1Metrics.formRating) - parseFloat(team2Metrics.formRating)) * 0.3;
             team1Score += formDiff * 0.25;
         } else {
-            // Reduce weight if form data is limited
-            team1Score += (team1Metrics.winPercent - team2Metrics.winPercent) * 0.15;
+            team1Score += (parseFloat(team1Metrics.winPercent) - parseFloat(team2Metrics.winPercent)) * 0.15;
         }
         
-        // Factor 3: Team synergy (15% weight)
-        const synergyDiff = (team1Synergy.score - team2Synergy.score) * 15;
+        const synergyDiff = (parseFloat(team1Synergy.score) - parseFloat(team2Synergy.score)) * 15;
         team1Score += synergyDiff * 0.15;
         
-        // Factor 4: Player head-to-head matchups (15% weight)
         if (playerH2HStats.hasData) {
-            const h2hDiff = playerH2HStats.team1WinRateVsOpponents - playerH2HStats.team2WinRateVsOpponents;
+            const h2hDiff = parseFloat(playerH2HStats.team1WinRateVsOpponents) - parseFloat(playerH2HStats.team2WinRateVsOpponents);
             team1Score += h2hDiff * 0.15;
         }
         
-        // Factor 5: Experience/reliability (10% weight)
         const reliabilityDiff = (team1Weight - team2Weight) / Math.max(team1Weight, team2Weight) * 10;
         team1Score += reliabilityDiff * 0.10;
         
-        // Clamp between 5 and 95
         team1Score = Math.max(5, Math.min(95, team1Score));
         
-        // Calculate confidence based on data availability
         let confidence = 50;
         const hasReliableData = team1Weight > 5 && team2Weight > 5;
         const hasH2H = playerH2HStats.hasData;
@@ -606,40 +568,35 @@ class PreMatchAnalyzer {
     generateKeyFactors(team1Metrics, team2Metrics, team1Synergy, team2Synergy, playerH2HStats, team1Name, team2Name) {
         const factors = [];
         
-        // Individual performance
-        if (team1Metrics.ppg > team2Metrics.ppg + 0.5) {
+        if (parseFloat(team1Metrics.ppg) > parseFloat(team2Metrics.ppg) + 0.5) {
             factors.push(`📊 ${team1Name} has higher individual player ratings (${team1Metrics.ppg} vs ${team2Metrics.ppg} PPG)`);
-        } else if (team2Metrics.ppg > team1Metrics.ppg + 0.5) {
+        } else if (parseFloat(team2Metrics.ppg) > parseFloat(team1Metrics.ppg) + 0.5) {
             factors.push(`📊 ${team2Name} has higher individual player ratings (${team2Metrics.ppg} vs ${team1Metrics.ppg} PPG)`);
         }
         
-        // Form
         if (team1Metrics.formRating !== "N/A" && team2Metrics.formRating !== "N/A") {
-            if (team1Metrics.formRating > team2Metrics.formRating + 10) {
+            if (parseFloat(team1Metrics.formRating) > parseFloat(team2Metrics.formRating) + 10) {
                 factors.push(`🔥 ${team1Name} players are in significantly better form (${team1Metrics.formRating}% vs ${team2Metrics.formRating}%)`);
-            } else if (team2Metrics.formRating > team1Metrics.formRating + 10) {
+            } else if (parseFloat(team2Metrics.formRating) > parseFloat(team1Metrics.formRating) + 10) {
                 factors.push(`🔥 ${team2Name} players are in significantly better form (${team2Metrics.formRating}% vs ${team1Metrics.formRating}%)`);
             }
         }
         
-        // Synergy
         if (team1Synergy.hasData && team2Synergy.hasData) {
-            if (team1Synergy.score > team2Synergy.score + 0.2) {
+            if (parseFloat(team1Synergy.score) > parseFloat(team2Synergy.score) + 0.2) {
                 factors.push(`🤝 ${team1Name} has better team chemistry (${team1Synergy.description.toLowerCase()})`);
-            } else if (team2Synergy.score > team1Synergy.score + 0.2) {
+            } else if (parseFloat(team2Synergy.score) > parseFloat(team1Synergy.score) + 0.2) {
                 factors.push(`🤝 ${team2Name} has better team chemistry (${team2Synergy.description.toLowerCase()})`);
             }
         }
         
-        // Head-to-head at player level
         if (playerH2HStats.hasData && playerH2HStats.totalMatchups > 0) {
-            if (playerH2HStats.team1WinRateVsOpponents > 55) {
+            if (parseFloat(playerH2HStats.team1WinRateVsOpponents) > 55) {
                 factors.push(`🏆 ${team1Name} players have historically dominated matchups against ${team2Name} players (${playerH2HStats.team1WinRateVsOpponents}% win rate)`);
-            } else if (playerH2HStats.team2WinRateVsOpponents > 55) {
+            } else if (parseFloat(playerH2HStats.team2WinRateVsOpponents) > 55) {
                 factors.push(`🏆 ${team2Name} players have historically dominated matchups against ${team1Name} players (${playerH2HStats.team2WinRateVsOpponents}% win rate)`);
             }
             
-            // Add specific key matchup if exists
             if (playerH2HStats.keyMatchups.length > 0) {
                 const topMatchup = playerH2HStats.keyMatchups[0];
                 factors.push(`⚡ Key matchup: ${topMatchup.winner} dominates ${topMatchup.loser} (${topMatchup.winRate}% win rate over ${topMatchup.games} games)`);
@@ -650,13 +607,12 @@ class PreMatchAnalyzer {
             factors.push("⚖️ Very evenly matched - could go either way!");
         }
         
-        return factors.slice(0, 5); // Limit to top 5 factors
+        return factors.slice(0, 5);
     }
     
-    generateInsights(team1Stats, team2Stats, team1Synergy, team2Synergy, playerH2HStats) {
+    generateInsights(team1Stats, team2Stats, team1Synergy, team2Synergy, playerH2HStats, team1Name, team2Name) {
         const insights = [];
         
-        // Find highest impact players (minimum 5 games)
         const allPlayers = [...team1Stats, ...team2Stats];
         const qualifiedPlayers = allPlayers.filter(p => p.games >= 5);
         
@@ -670,19 +626,16 @@ class PreMatchAnalyzer {
             }
         }
         
-        // Find players in poor form (minimum 3 games in last 5)
-        const poorForm = allPlayers.filter(p => p.formRating !== null && p.formRating < 40 && p.games >= 5);
+        const poorForm = allPlayers.filter(p => p.formRating !== null && parseFloat(p.formRating) < 40 && p.games >= 5);
         if (poorForm.length > 0) {
             insights.push(`⚠️ ${poorForm.map(p => p.name).join(', ')} ${poorForm.length === 1 ? 'is' : 'are'} out of form - potential weak ${poorForm.length === 1 ? 'link' : 'links'}`);
         }
         
-        // Find hot form players
-        const hotForm = allPlayers.filter(p => p.formRating !== null && p.formRating >= 70 && p.games >= 5);
+        const hotForm = allPlayers.filter(p => p.formRating !== null && parseFloat(p.formRating) >= 70 && p.games >= 5);
         if (hotForm.length > 0) {
             insights.push(`🔥 ${hotForm.map(p => p.name).join(', ')} ${hotForm.length === 1 ? 'is' : 'are'} in excellent form!`);
         }
         
-        // Goal threat assessment (qualified players only)
         const team1Qualified = team1Stats.filter(p => p.games >= 5);
         const team2Qualified = team2Stats.filter(p => p.games >= 5);
         
@@ -691,24 +644,22 @@ class PreMatchAnalyzer {
             const team2GoalThreat = team2Qualified.reduce((sum, p) => sum + p.goalsPerGame, 0) / team2Qualified.length;
             
             if (team1GoalThreat > team2GoalThreat + 0.5) {
-                insights.push(`⚽ ${analysis.team1.name} has higher goal scoring potential (${team1GoalThreat.toFixed(2)} vs ${team2GoalThreat.toFixed(2)} goals/game)`);
+                insights.push(`⚽ ${team1Name} has higher goal scoring potential (${team1GoalThreat.toFixed(2)} vs ${team2GoalThreat.toFixed(2)} goals/game)`);
             } else if (team2GoalThreat > team1GoalThreat + 0.5) {
-                insights.push(`⚽ ${analysis.team2.name} has higher goal scoring potential (${team2GoalThreat.toFixed(2)} vs ${team1GoalThreat.toFixed(2)} goals/game)`);
+                insights.push(`⚽ ${team2Name} has higher goal scoring potential (${team2GoalThreat.toFixed(2)} vs ${team1GoalThreat.toFixed(2)} goals/game)`);
             }
         }
         
-        // Head-to-head insights
         if (playerH2HStats.hasData && playerH2HStats.keyMatchups.length > 0) {
             insights.push(`📊 ${playerH2HStats.keyMatchups.length} key player matchup${playerH2HStats.keyMatchups.length > 1 ? 's' : ''} identified that could influence the result`);
         }
         
-        // Experience gap
         const team1Exp = team1Stats.reduce((sum, p) => sum + p.games, 0);
         const team2Exp = team2Stats.reduce((sum, p) => sum + p.games, 0);
         
         if (Math.abs(team1Exp - team2Exp) > 50) {
-            const moreExp = team1Exp > team2Exp ? "White Team" : "Colour Team";
-            const lessExp = team1Exp > team2Exp ? "Colour Team" : "White Team";
+            const moreExp = team1Exp > team2Exp ? team1Name : team2Name;
+            const lessExp = team1Exp > team2Exp ? team2Name : team1Name;
             insights.push(`🎓 ${moreExp} has significantly more experience (${Math.max(team1Exp, team2Exp)} vs ${Math.min(team1Exp, team2Exp)} total games) - ${lessExp} may be at a disadvantage`);
         }
         
@@ -717,8 +668,6 @@ class PreMatchAnalyzer {
     
     identifyKeyPlayers(team1Stats, team2Stats) {
         const allPlayers = [...team1Stats, ...team2Stats];
-        
-        // Only include players with minimum 5 games for these categories
         const qualifiedPlayers = allPlayers.filter(p => p.games >= 5);
         
         return {
@@ -727,7 +676,7 @@ class PreMatchAnalyzer {
             bestGoalsPerGame: qualifiedPlayers.sort((a, b) => b.goalsPerGame - a.goalsPerGame)[0] || null,
             bestAssistsPerGame: qualifiedPlayers.sort((a, b) => b.assistsPerGame - a.assistsPerGame)[0] || null,
             mostReliable: qualifiedPlayers.sort((a, b) => b.reliability - a.reliability)[0] || null,
-            inForm: qualifiedPlayers.filter(p => p.formRating !== null).sort((a, b) => b.formRating - a.formRating)[0] || null
+            inForm: qualifiedPlayers.filter(p => p.formRating !== null).sort((a, b) => parseFloat(b.formRating) - parseFloat(a.formRating))[0] || null
         };
     }
     
@@ -758,15 +707,6 @@ class PreMatchAnalyzer {
         const h2h = analysis.playerHeadToHead;
         
         const confidenceColor = pred.confidence > 70 ? 'success' : (pred.confidence > 50 ? 'warning' : 'secondary');
-        
-        // Helper to format player stats with qualification note
-        const formatPlayerStat = (player, statType) => {
-            if (!player) return '<span class="text-muted">N/A</span>';
-            if (player.games < 5) {
-                return `<span title="Only ${player.games} games played (minimum 5 for qualification)">${player[statType]} <small class="text-muted">*</small></span>`;
-            }
-            return player[statType];
-        };
         
         return `
             <div class="analysis-card">
@@ -831,27 +771,27 @@ class PreMatchAnalyzer {
                     <h4><i class="fas fa-history"></i> Player Head-to-Head Analysis</h4>
                     <div class="row text-center">
                         <div class="col-md-4">
-                            <div class="h2h-stat">${h2h.totalMatchups} Player Matchups</div>
+                            <div class="h2h-stat"><strong>${h2h.totalMatchups}</strong> Player Matchups</div>
                         </div>
                         <div class="col-md-4">
-                            <div class="h2h-stat text-primary">${team1.name}: ${h2h.team1WinRateVsOpponents}% Win Rate</div>
+                            <div class="h2h-stat text-primary"><strong>${team1.name}: ${h2h.team1WinRateVsOpponents}%</strong> Win Rate</div>
                         </div>
                         <div class="col-md-4">
-                            <div class="h2h-stat text-danger">${team2.name}: ${h2h.team2WinRateVsOpponents}% Win Rate</div>
+                            <div class="h2h-stat text-danger"><strong>${team2.name}: ${h2h.team2WinRateVsOpponents}%</strong> Win Rate</div>
                         </div>
                     </div>
                     ${h2h.keyMatchups.length > 0 ? `
                     <div class="mt-3">
-                        <strong>Key Individual Matchups:</strong>
+                        <strong>⚡ Key Individual Matchups:</strong>
                         <ul class="mt-2">
                             ${h2h.keyMatchups.slice(0, 3).map(m => `
-                                <li>${m.winner} dominates ${m.loser} (${m.winRate}% win rate over ${m.games} games, scoring ${m.goalsPerGame} goals/game)</li>
+                                <li><strong>${m.winner}</strong> dominates <strong>${m.loser}</strong> (${m.winRate}% win rate over ${m.games} games, scoring ${m.goalsPerGame} goals/game)</li>
                             `).join('')}
                         </ul>
                     </div>
                     ` : ''}
                 </div>
-                ` : '<div class="head-to-head text-muted">Insufficient player head-to-head data for meaningful analysis</div>'}
+                ` : '<div class="head-to-head text-muted">📊 Insufficient player head-to-head data for meaningful analysis (need 2+ games between players)</div>'}
                 
                 <div class="insights">
                     <h4><i class="fas fa-lightbulb"></i> Key Insights</h4>
@@ -861,34 +801,30 @@ class PreMatchAnalyzer {
                 </div>
                 
                 <div class="key-players">
-                    <h4><i class="fas fa-star"></i> Key Players</h4>
+                    <h4><i class="fas fa-star"></i> Key Players <small class="text-muted">(min 5 games)</small></h4>
                     <div class="row">
                         <div class="col-md-4">
                             <div class="player-highlight">
                                 <i class="fas fa-futbol"></i> Top Scorer: <strong>${analysis.keyPlayers.topScorer?.name || 'N/A'}</strong>
                                 <small>(${analysis.keyPlayers.topScorer?.goals || 0} goals)</small>
-                                ${analysis.keyPlayers.topScorer?.games < 5 ? '<br><small class="text-muted">* Only ' + analysis.keyPlayers.topScorer?.games + ' games played</small>' : ''}
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="player-highlight">
                                 <i class="fas fa-handshake"></i> Best Creator: <strong>${analysis.keyPlayers.bestCreator?.name || 'N/A'}</strong>
                                 <small>(${analysis.keyPlayers.bestCreator?.assists || 0} assists)</small>
-                                ${analysis.keyPlayers.bestCreator?.games < 5 ? '<br><small class="text-muted">* Only ' + analysis.keyPlayers.bestCreator?.games + ' games played</small>' : ''}
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="player-highlight">
                                 <i class="fas fa-chart-line"></i> Best Goals/Game: <strong>${analysis.keyPlayers.bestGoalsPerGame?.name || 'N/A'}</strong>
                                 <small>(${(analysis.keyPlayers.bestGoalsPerGame?.goalsPerGame || 0).toFixed(2)} per game)</small>
-                                ${analysis.keyPlayers.bestGoalsPerGame?.games < 5 ? '<br><small class="text-muted">* Only ' + analysis.keyPlayers.bestGoalsPerGame?.games + ' games played</small>' : ''}
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="player-highlight">
                                 <i class="fas fa-chart-line"></i> Best Assists/Game: <strong>${analysis.keyPlayers.bestAssistsPerGame?.name || 'N/A'}</strong>
                                 <small>(${(analysis.keyPlayers.bestAssistsPerGame?.assistsPerGame || 0).toFixed(2)} per game)</small>
-                                ${analysis.keyPlayers.bestAssistsPerGame?.games < 5 ? '<br><small class="text-muted">* Only ' + analysis.keyPlayers.bestAssistsPerGame?.games + ' games played</small>' : ''}
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -901,12 +837,8 @@ class PreMatchAnalyzer {
                             <div class="player-highlight">
                                 <i class="fas fa-fire"></i> In Form: <strong>${analysis.keyPlayers.inForm?.name || 'N/A'}</strong>
                                 <small>(${analysis.keyPlayers.inForm?.formRating || 0}% last ${analysis.keyPlayers.inForm?.formGames || 0} games)</small>
-                                ${analysis.keyPlayers.inForm?.formGames < 3 ? '<br><small class="text-muted">* Only ' + analysis.keyPlayers.inForm?.formGames + ' games in last 5</small>' : ''}
                             </div>
                         </div>
-                    </div>
-                    <div class="mt-2 text-muted small">
-                        <i class="fas fa-info-circle"></i> * Players need minimum 5 games for qualification stats. Form requires 3+ games in last 5.
                     </div>
                 </div>
                 
@@ -953,7 +885,7 @@ class PreMatchAnalyzer {
                         </div>
                     </div>
                     <div class="mt-2 text-muted small">
-                        <i class="fas fa-info-circle"></i> Impact Score: Weighted combination of PPG, Goals/game, Assists/game, and Reliability (min 5 games)
+                        <i class="fas fa-info-circle"></i> *Impact Score requires minimum 5 games | Form requires 3+ games in last 5
                     </div>
                 </div>
             </div>
