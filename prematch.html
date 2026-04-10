@@ -485,9 +485,35 @@
                 try {
                     const analysis = analyzer.analyzeTeams(whiteTeam, colourTeam);
                     
-                    // Override team names to White Team and Colour Team
+                    // Override team names in prediction key factors (replace "Team 1" and "Team 2")
+                    if (analysis.prediction && analysis.prediction.keyFactors) {
+                        analysis.prediction.keyFactors = analysis.prediction.keyFactors.map(factor => 
+                            factor.replace(/Team 1/g, 'White Team').replace(/Team 2/g, 'Colour Team')
+                        );
+                    }
+                    
+                    // Override the predicted winner
+                    if (analysis.prediction) {
+                        analysis.prediction.predictedWinner = analysis.prediction.predictedWinner === "Team 1" ? "White Team" : "Colour Team";
+                    }
+                    
+                    // Override team names in head-to-head stats if they exist
+                    if (analysis.headToHead) {
+                        // The head-to-head object doesn't have team names directly, but we can add them for display
+                        analysis.headToHead.team1Name = "White Team";
+                        analysis.headToHead.team2Name = "Colour Team";
+                    }
+                    
+                    // Override team names in the teams themselves
                     analysis.team1.name = "White Team";
                     analysis.team2.name = "Colour Team";
+                    
+                    // Also override any "Team 1" or "Team 2" in insights
+                    if (analysis.insights) {
+                        analysis.insights = analysis.insights.map(insight => 
+                            insight.replace(/Team 1/g, 'White Team').replace(/Team 2/g, 'Colour Team')
+                        );
+                    }
                     
                     const html = analyzer.generateHTMLReport(analysis);
                     
