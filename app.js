@@ -12,21 +12,21 @@ class SidewindersStats {
     }
     
     async init() {
-        try {
-            this.showLoading(true);
-            await this.loadAllData();
-            this.calculateLeagueTable();
-            this.initLeagueTable();
-            this.initPlayerSelector();
-            this.updateLastUpdated();
-            this.showLoading(false);
-            
-        } catch (error) {
-            console.error('Initialization error:', error);
-            this.showError('Failed to load data. Please check GameLog.csv file.');
-            this.showLoading(false);
-        }
+    try {
+        this.showLoading(true);
+        await this.loadAllData();
+        this.calculateLeagueTable();
+        this.initLeagueTable();
+        this.initPlayerSelector();
+        this.updateLastUpdated();
+    } catch (error) {
+        console.error('Initialization error:', error);
+        this.showError('Failed to load data. Please check GameLog.csv file.');
+    } finally {
+        // This line guarantees the spinning wheel disappears no matter what!
+        this.showLoading(false); 
     }
+}
     
     async loadAllData() {
         try {
