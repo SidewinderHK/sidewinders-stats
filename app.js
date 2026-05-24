@@ -1,4 +1,4 @@
-// Sidewinders Stats - Updated with PPG, Win % and Team Selection Balance Modules
+// Sidewinders Stats - Corrected Initialization Matrix
 class SidewindersStats {
     constructor() {
         this.gameLog = [];
@@ -6,7 +6,7 @@ class SidewindersStats {
         this.players = [];
         this.selectedPlayer = null;
         
-        // Cache references for generated balanced array profiles
+        // Explicitly define team sheet slots on the constructor to avoid early look-up crashes
         this.currentWhiteTeam = [];
         this.currentColourTeam = [];
         
@@ -75,13 +75,13 @@ class SidewindersStats {
             stats.Played += 1;
             
             const result = row['Result'] ? row['Result'].trim().toLowerCase() : '';
-            if (result === 'win') {
+            if (result === 'win' || result === 'win ') {
                 stats.Wins += 1;
                 stats.TotalPoints += 3;
-            } else if (result === 'draw') {
+            } else if (result === 'draw' || result === 'draw ') {
                 stats.Draws += 1;
                 stats.TotalPoints += 1;
-            } else if (result === 'loss') {
+            } else if (result === 'loss' || result === 'loss ') {
                 stats.Losses += 1;
             }
             
@@ -95,7 +95,6 @@ class SidewindersStats {
             return player;
         });
         
-        // Default ranking sorting precedence logic rules (Pts -> Gls -> Ast)
         this.leagueTable.sort((a, b) => {
             if (b.TotalPoints !== a.TotalPoints) return b.TotalPoints - a.TotalPoints;
             if (b.Goals !== a.Goals) return b.Goals - a.Goals;
@@ -105,13 +104,14 @@ class SidewindersStats {
     
     initLeagueTable() {
         const tbody = document.getElementById('standingsTableBody');
+        if (!tbody) return;
         tbody.innerHTML = '';
         
         this.leagueTable.forEach((row, index) => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td class="text-center fw-bold text-muted">${index + 1}</td>
-                <td class="clickable-player text-capitalize" onclick="window.sidewindersApp.selectPlayerFromTable('${row.Player}')">
+                <td class="clickable-player text-capitalize" onclick="window.sidewindersApp.selectPlayerFromTable('${row.Player.replace(/'/g, "\\'")}')">
                     <strong>${row.Player}</strong>
                 </td>
                 <td class="text-center">${row.Played}</td>
@@ -127,11 +127,13 @@ class SidewindersStats {
             tbody.appendChild(tr);
         });
         
-        // Instantiate DataTables framework layout configurations safely
+        if ($.fn.DataTable.isDataTable('#standingsTable')) {
+            $('#standingsTable').DataTable().destroy();
+        }
+        
         $('#standingsTable').DataTable({
             pageLength: 25,
-            order: [[8, 'desc']], // Order by default Points column index sequence
-            retrieve: true,
+            order: [[8, 'desc']], 
             responsive: true,
             columnDefs: [
                 { targets: [0, 8, 9, 10], orderSequence: ['desc', 'asc'] }
@@ -141,7 +143,7 @@ class SidewindersStats {
     
     initPlayerSelector() {
         const select = document.getElementById('playerSelect');
-        // Keep placeholder intact, clear dynamic previous entries safely
+        if (!select) return;
         select.innerHTML = '<option value="">-- Choose Roster Option --</option>';
         
         this.players.forEach(player => {
@@ -151,19 +153,16 @@ class SidewindersStats {
             select.appendChild(option);
         });
         
-        $(select).on('change', (e) => {
+        $(select).off('change').on('change', (e) => {
             this.renderPlayerAnalysis(e.target.value);
         });
     }
     
     initTeamGenerator() {
-        console.log('Initializing team generator core selection options...');
         const container = $('#playerCheckboxContainer');
         if (!container.length) return;
-        
         container.empty();
         
-        // Build out the checkbox elements extraction metrics from baseline configurations
         this.players.forEach((player, idx) => {
             const rowData = this.leagueTable.find(p => p.Player === player);
             const ppg = rowData ? rowData.PPG : 0;
@@ -185,28 +184,26 @@ class SidewindersStats {
             container.append(itemHtml);
         });
         
-        // Event triggers setup configurations
-        $('.player-generator-check').on('change', () => this.updateSelectedPlayersCount());
+        $('.player-generator-check').off('change').on('change', () => this.updateSelectedPlayersCount());
         
-        $('#btnSelectAllPlayers').on('click', () => {
+        $('#btnSelectAllPlayers').off('click').on('click', () => {
             $('.player-generator-check').prop('checked', true);
             this.updateSelectedPlayersCount();
         });
         
-        $('#btnClearAllPlayers').on('click', () => {
+        $('#btnClearAllPlayers').off('click').on('click', () => {
             $('.player-generator-check').prop('checked', false);
             this.updateSelectedPlayersCount();
             $('#generatedTeamsArea').slideUp(200);
         });
         
-        $('#btnGenerateTeams').on('click', () => this.generateBalancedTeams());
-        $('#btnCopyTeamSheet').on('click', () => this.copyTeamSheetToClipboard());
+        $('#btnGenerateTeams').off('click').on('click', () => this.generateBalancedTeams());
+        $('#btnCopyTeamSheet').off('click').on('click', () => this.copyTeamSheetToClipboard());
     }
     
     updateSelectedPlayersCount() {
         const checkedCount = $('.player-generator-check:checked').length;
         $('#selectedPlayersCount').text(checkedCount);
-        // Enable option only if we have at least 2 candidates to balance teams
         $('#btnGenerateTeams').prop('disabled', checkedCount < 2);
     }
     
@@ -225,7 +222,6 @@ class SidewindersStats {
         
         if (selectedPlayers.length < 2) return;
         
-        // Sort descending by chosen optimization criteria
         selectedPlayers.sort((a, b) => b[metric] - a[metric]);
         
         const whiteTeam = [];
@@ -233,7 +229,6 @@ class SidewindersStats {
         let whiteSum = 0;
         let colourSum = 0;
         
-        // Greedy snake-draft alternative optimization allocation matrix loop
         selectedPlayers.forEach(player => {
             if (whiteTeam.length > colourTeam.length + 1) {
                 colourTeam.push(player);
@@ -252,7 +247,6 @@ class SidewindersStats {
             }
         });
         
-        // Render lists loops updates helper layout layer
         const renderList = (element, collection) => {
             element.empty();
             collection.forEach(p => {
@@ -279,7 +273,6 @@ class SidewindersStats {
         $('#colourTeamMetric').text(`${displayLabel}: ${colourAvg.toFixed(1)}${displayUnit}`);
         $('#teamsDiffMetric').text(difference.toFixed(1) + displayUnit);
         
-        // Update styling indicator flags properties context values dynamically
         const diffBadge = $('#teamsDiffMetric').removeClass();
         if (difference <= 0.2 || (metric === 'WinPercent' && difference <= 5)) {
             diffBadge.addClass('badge bg-success fs-6 ms-1');
@@ -289,7 +282,6 @@ class SidewindersStats {
             diffBadge.addClass('badge bg-danger fs-6 ms-1');
         }
         
-        // Persist arrays references locally into runtime scope for clipboard parsing copies
         this.currentWhiteTeam = whiteTeam;
         this.currentColourTeam = colourTeam;
         
@@ -301,19 +293,14 @@ class SidewindersStats {
     }
     
     copyTeamSheetToClipboard() {
-        if (!this.currentWhiteTeam || !this.currentColourTeam) return;
+        if (!this.currentWhiteTeam.length || !this.currentColourTeam.length) return;
         
         let teamSheetText = `⚽ *Sidewinders Match Squad Selection* ⚽\n\n`;
-        
         teamSheetText += `⚪ *WHITE TEAM* ⚪\n`;
-        this.currentWhiteTeam.forEach((p, index) => {
-            teamSheetText += `${index + 1}. ${p.name}\n`;
-        });
+        this.currentWhiteTeam.forEach((p, index) => { teamSheetText += `${index + 1}. ${p.name}\n`; });
         
         teamSheetText += `\n🟡 *COLOUR TEAM* 🟡\n`;
-        this.currentColourTeam.forEach((p, index) => {
-            teamSheetText += `${index + 1}. ${p.name}\n`;
-        });
+        this.currentColourTeam.forEach((p, index) => { teamSheetText += `${index + 1}. ${p.name}\n`; });
         
         teamSheetText += `\n📊 Balanced via Sidewinders Football Analytics Platform`;
         
@@ -324,21 +311,18 @@ class SidewindersStats {
                         <strong class="me-auto">Success!</strong>
                         <button type="button" class="btn-close btn-close-white" onclick="this.parentElement.parentElement.remove()"></button>
                     </div>
-                    <div class="toast-body">
-                        Team Sheet copied to clipboard in WhatsApp format!
-                    </div>
+                    <div class="toast-body">Team Sheet copied to clipboard!</div>
                 </div>`;
                 $('body').append(toast);
                 setTimeout(() => $('.toast').fadeOut(400, function() { $(this).remove(); }), 3000);
             })
-            .catch(err => {
-                console.error('Clipboard action error occurred:', err);
-                alert('Could not copy to clipboard. Please grant clipboard layout permissions.');
-            });
+            .catch(err => { alert('Could not copy to clipboard automatically.'); });
     }
 
     selectPlayerFromTable(playerName) {
-        document.getElementById('playerSelect').value = playerName;
+        const select = document.getElementById('playerSelect');
+        if (!select) return;
+        select.value = playerName;
         this.renderPlayerAnalysis(playerName);
         
         $('html, body').animate({
@@ -349,6 +333,7 @@ class SidewindersStats {
     renderPlayerAnalysis(playerName) {
         const contentDiv = document.getElementById('analysisContent');
         const placeholderDiv = document.getElementById('analysisPlaceholder');
+        if (!contentDiv || !placeholderDiv) return;
         
         if (!playerName || playerName === '') {
             contentDiv.classList.add('d-none');
@@ -365,7 +350,6 @@ class SidewindersStats {
             Player: playerName, Played: 0, Wins: 0, Draws: 0, Losses: 0, Goals: 0, Assists: 0, PPG: 0, WinPercent: 0
         };
         
-        // Hydrate data visual text elements fields attributes
         document.getElementById('anaPlayerName').innerText = playerStats.Player;
         document.getElementById('anaPlayerPPG').innerText = `${playerStats.PPG.toFixed(2)} PPG`;
         document.getElementById('anaMatches').innerText = playerStats.Played;
@@ -373,20 +357,19 @@ class SidewindersStats {
         document.getElementById('anaGoals').innerText = playerStats.Goals;
         document.getElementById('anaAssists').innerText = playerStats.Assists;
         
-        // Build out chronological timeline structures matching past histories logs (Reverse sequential arrays)
         const historyContainer = document.getElementById('anaHistoryLog');
         historyContainer.innerHTML = '';
         
         const personalMatches = this.gameLog.filter(row => row['Player'] === playerName);
         
         if (personalMatches.length === 0) {
-            historyContainer.innerHTML = '<div class="p-3 text-muted text-center small">No match records logged inside the current GameLog structures.</div>';
+            historyContainer.innerHTML = '<div class="p-3 text-muted text-center small">No match records logged.</div>';
             return;
         }
         
         personalMatches.slice().reverse().forEach(row => {
             const div = document.createElement('div');
-            div.className = 'list-group-item d-flex justify-content-between align-items-center py-2 touch-friendly';
+            div.className = 'list-group-item d-flex justify-content-between align-items-center py-2';
             
             const team = row['Team'] ? row['Team'].trim() : 'White';
             const badgeClass = team.toLowerCase() === 'white' ? 'bg-light text-dark border' : 'bg-primary text-white';
@@ -403,8 +386,8 @@ class SidewindersStats {
                 </div>
                 <div class="text-end">
                     <span class="badge ${resultBadgeClass} me-2">${result}</span>
-                    <span class="badge bg-outline-secondary text-dark border small me-1">G: ${row['Gls'] || 0}</span>
-                    <span class="badge bg-outline-secondary text-dark border small">A: ${row['Ast'] || 0}</span>
+                    <span class="badge bg-light text-dark border small me-1">G: ${row['Gls'] || 0}</span>
+                    <span class="badge bg-light text-dark border small">A: ${row['Ast'] || 0}</span>
                 </div>
             `;
             historyContainer.appendChild(div);
@@ -412,7 +395,7 @@ class SidewindersStats {
     }
     
     updateLastUpdated() {
-        if (this.gameLog.length > 0) {
+        if (this.gameLog.length > 0 && document.getElementById('lastUpdated')) {
             const lastRecord = this.gameLog[this.gameLog.length - 1];
             document.getElementById('lastUpdated').innerText = `Active Logs Tracking: ${this.gameLog.length} rows detected | Latest Match Sequence Index: #${lastRecord['ID'] || 'N/A'} (${lastRecord['Date'] || 'N/A'})`;
         }
@@ -420,9 +403,7 @@ class SidewindersStats {
     
     async fetchCSV(url) {
         const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`HTTP network response failure state error code: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP network error code: ${response.status}`);
         return await response.text();
     }
     
@@ -435,7 +416,6 @@ class SidewindersStats {
         
         for (let i = 1; i < lines.length; i++) {
             if (!lines[i].trim()) continue;
-            
             const currentline = lines[i].split(',');
             const row = {};
             headers.forEach((header, index) => {
@@ -463,39 +443,31 @@ class SidewindersStats {
     }
 }
 
-// Intercept routing link anchors clicks actions events bindings triggers
+// Global anchor routing configurations 
 $(document).ready(function() {
     $('a[href="#league"]').click(function(e) {
         e.preventDefault();
-        $('html, body').animate({
-            scrollTop: $('#league').offset().top - 20
-        }, 500);
+        $('html, body').animate({ scrollTop: $('#league').offset().top - 20 }, 500);
     });
     
     $('a[href="#teamGenerator"]').click(function(e) {
         e.preventDefault();
-        $('html, body').animate({
-            scrollTop: $('#teamGenerator').offset().top - 20
-        }, 500);
+        $('html, body').animate({ scrollTop: $('#teamGenerator').offset().top - 20 }, 500);
     });
     
     $('a[href="#analysis"]').click(function(e) {
         e.preventDefault();
-        $('html, body').animate({
-            scrollTop: $('#analysis').offset().top - 20
-        }, 500);
+        $('html, body').animate({ scrollTop: $('#analysis').offset().top - 20 }, 500);
     });
 });
 
 function shareCurrentPlayer() {
     const playerSelect = document.getElementById('playerSelect');
-    const playerName = playerSelect.value;
-    
-    if (!playerName) {
+    if (!playerSelect || !playerSelect.value) {
         alert('Please select a player first.');
         return;
     }
-    
+    const playerName = playerSelect.value;
     const url = new URL(window.location.href);
     url.hash = `player-${encodeURIComponent(playerName)}`;
     
@@ -506,17 +478,12 @@ function shareCurrentPlayer() {
                     <strong class="me-auto">Success!</strong>
                     <button type="button" class="btn-close btn-close-white" onclick="this.parentElement.parentElement.remove()"></button>
                 </div>
-                <div class="toast-body">
-                    Link to ${playerName}'s analysis copied to clipboard!
-                </div>
+                <div class="toast-body">Link to ${playerName}'s analysis copied!</div>
             </div>`;
             $('body').append(toast);
             setTimeout(() => $('.toast').fadeOut(400, function() { $(this).remove(); }), 3000);
         })
-        .catch(err => {
-            console.error('Failed to copy link references properties maps:', err);
-            alert('Failed to copy link. You can manually copy the URL from your browser.');
-        });
+        .catch(err => { alert('Failed to copy link automatically.'); });
 }
 
-// Global initialization application deployment assignment hook binding
+window.sidewindersApp = new SidewindersStats();
