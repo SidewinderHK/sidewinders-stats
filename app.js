@@ -1,4 +1,4 @@
-// Sidewinders Stats - v3.1 GitHub Pages Stable Build
+// Sidewinders Stats - v3.2 GitHub Pages Bulletproof Build
 class SidewindersStats {
     constructor() {
         this.gameLog = [];
@@ -8,7 +8,6 @@ class SidewindersStats {
         this.MIN_GAMES_THRESHOLD = 3; 
         
         $(document).ready(() => {
-            // Global attachment fix to allow index.html to hook into calculations
             window.sidewindersApp = this; 
             this.init();
         });
@@ -64,6 +63,7 @@ class SidewindersStats {
             const stats = playerStats[player];
             stats.Games++;
             
+            // Safe evaluation fallback logic for missing fields
             const result = game['Result'] ? game['Result'].trim() : '';
             if (result === 'Win') {
                 stats.Wins++;
@@ -92,7 +92,6 @@ class SidewindersStats {
     }
     
     async fetchCSV(filename) {
-        // Appending a timestamp query string bypasses destructive aggressive GitHub Pages caching
         const cacheBuster = `?t=${new Date().getTime()}`;
         const response = await fetch(filename + cacheBuster);
         if (!response.ok) throw new Error(`HTTP Error Status: ${response.status}`);
@@ -106,7 +105,7 @@ class SidewindersStats {
         const lines = cleanText.split('\n').filter(line => line.trim() !== '');
         if (lines.length < 2) return [];
         
-        const headers = this.parseCSVLine(lines[0]).map(h => h.replace(/^"(.*)"$/, '$1').trim());
+        const headers = this.parseCSVLine(lines[0]).map(h => h ? h.replace(/^"(.*)"$/, '$1').trim() : '');
         const data = [];
         
         for (let i = 1; i < lines.length; i++) {
@@ -115,7 +114,7 @@ class SidewindersStats {
             
             const row = {};
             headers.forEach((header, index) => {
-                if (values[index] !== undefined) {
+                if (header && values[index] !== undefined) {
                     let value = values[index].replace(/^"(.*)"$/, '$1').trim();
                     const numericColumns = ['Gls', 'OG', 'Ast', 'Pen'];
                     if (numericColumns.includes(header) && !isNaN(value) && value !== '') {
@@ -276,7 +275,6 @@ class SidewindersStats {
         const playerMatches = this.gameLog
             .filter(game => game['Player'] === playerName);
 
-        // Sort by ID numeric value descending to ensure chronologically correct recent form
         playerMatches.sort((a, b) => (parseInt(b['ID']) || 0) - (parseInt(a['ID']) || 0));
 
         const lastFive = playerMatches.slice(0, 5);
@@ -310,10 +308,16 @@ class SidewindersStats {
             let gamesInCommon = 0, sameTeamGames = 0, winTogether = 0, oppositeTeamGames = 0, selectedWinsVsOther = 0;
             
             const selectedGameMap = {};
-            selectedGames.forEach(g => { selectedGameMap[g['ID'] + '|' + (g['Team'] ? g['Team'].trim() : '')] = g; });
+            selectedGames.forEach(g => { 
+                const teamName = g['Team'] ? g['Team'].trim() : '';
+                selectedGameMap[g['ID'] + '|' + teamName] = g; 
+            });
             
             const otherGameMap = {};
-            otherGames.forEach(g => { otherGameMap[g['ID'] + '|' + (g['Team'] ? g['Team'].trim() : '')] = g; });
+            otherGames.forEach(g => { 
+                const teamName = g['Team'] ? g['Team'].trim() : '';
+                otherGameMap[g['ID'] + '|' + teamName] = g; 
+            });
             
             Object.keys(selectedGameMap).forEach(key => {
                 if (otherGameMap[key]) {
@@ -324,7 +328,9 @@ class SidewindersStats {
             
             selectedGames.forEach(sGame => {
                 otherGames.forEach(oGame => {
-                    if (sGame['ID'] === oGame['ID'] && sGame['Team'] !== oGame['Team']) {
+                    const sTeam = sGame['Team'] ? sGame['Team'].trim() : 'White';
+                    const oTeam = oGame['Team'] ? oGame['Team'].trim() : 'Colour';
+                    if (sGame['ID'] === oGame['ID'] && sTeam !== oTeam) {
                         gamesInCommon++; oppositeTeamGames++;
                         if (sGame['Result'] && sGame['Result'].trim() === 'Win') selectedWinsVsOther++;
                     }
@@ -395,5 +401,4 @@ class SidewindersStats {
     showError(msg) { $('.container').prepend(`<div class="alert alert-danger"><strong>Error:</strong> ${msg}</div>`); }
 }
 
-// Ingest initialization handler
 new SidewindersStats();
