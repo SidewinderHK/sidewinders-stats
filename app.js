@@ -5,7 +5,7 @@ class SidewindersStats {
         this.leagueTable = [];
         this.players = [];
         this.selectedPlayer = null;
-        this.MIN_GAMES_THRESHOLD = 3; 
+        this.MIN_GAMES_THRESHOLD = 5; // CHANGED: Updated target threshold logic limit from 3 to 5
         
         $(document).ready(() => {
             window.sidewindersApp = this; 
@@ -63,7 +63,6 @@ class SidewindersStats {
             const stats = playerStats[player];
             stats.Games++;
             
-            // Safe evaluation fallback logic for missing fields
             const result = game['Result'] ? game['Result'].trim() : '';
             if (result === 'Win') {
                 stats.Wins++;
