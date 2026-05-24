@@ -1,14 +1,14 @@
-// Sidewinders Stats - v3.3 GitHub Pages Default-Off Fix
+// Sidewinders Stats - v3.4 State-Buster Build
 class SidewindersStats {
     constructor() {
         this.gameLog = [];
         this.leagueTable = [];
         this.players = [];
         this.selectedPlayer = null;
-        this.MIN_GAMES_THRESHOLD = 5; // Configured minimum threshold
+        this.MIN_GAMES_THRESHOLD = 5; 
         
         $(document).ready(() => {
-            // FORCE FIX: Explicitly uncheck the toggle on fresh loads to break browser state cache
+            // Force the checkbox toggle visually off on load
             $('#filterMinGames').prop('checked', false);
             
             window.sidewindersApp = this; 
@@ -153,7 +153,10 @@ class SidewindersStats {
     
     initLeagueTable() {
         if ($.fn.DataTable.isDataTable('#leagueTable')) {
-            $('#leagueTable').DataTable().destroy();
+            // CRITICAL FIX: Clear out previous browser state memories explicitly before destroying
+            const tableInstance = $('#leagueTable').DataTable();
+            tableInstance.state.clear(); 
+            tableInstance.destroy();
         }
         
         const shouldFilter = $('#filterMinGames').is(':checked');
@@ -316,91 +319,3 @@ class SidewindersStats {
             });
             
             const otherGameMap = {};
-            otherGames.forEach(g => { 
-                const teamName = g['Team'] ? g['Team'].trim() : '';
-                otherGameMap[g['ID'] + '|' + teamName] = g; 
-            });
-            
-            Object.keys(selectedGameMap).forEach(key => {
-                if (otherGameMap[key]) {
-                    gamesInCommon++; sameTeamGames++;
-                    if (selectedGameMap[key]['Result'] && selectedGameMap[key]['Result'].trim() === 'Win') winTogether++;
-                }
-            });
-            
-            selectedGames.forEach(sGame => {
-                otherGames.forEach(oGame => {
-                    const sTeam = sGame['Team'] ? sGame['Team'].trim() : 'White';
-                    const oTeam = oGame['Team'] ? oGame['Team'].trim() : 'Colour';
-                    if (sGame['ID'] === oGame['ID'] && sTeam !== oTeam) {
-                        gamesInCommon++; oppositeTeamGames++;
-                        if (sGame['Result'] && sGame['Result'].trim() === 'Win') selectedWinsVsOther++;
-                    }
-                });
-            });
-            
-            if (gamesInCommon > 0) {
-                analysisData.push({
-                    player: otherPlayer,
-                    gamesInCommon: gamesInCommon,
-                    sameTeam: sameTeamGames,
-                    oppositeTeam: oppositeTeamGames,
-                    winPercentTogether: sameTeamGames > 0 ? Math.round((winTogether / sameTeamGames) * 100) : 0,
-                    h2hWinPercent: oppositeTeamGames > 0 ? Math.round((selectedWinsVsOther / oppositeTeamGames) * 100) : 0
-                });
-            }
-        });
-        
-        this.initPartnershipDataTable(analysisData);
-    }
-    
-    initPartnershipDataTable(data) {
-        if ($.fn.DataTable.isDataTable('#partnershipTable')) {
-            $('#partnershipTable').DataTable().destroy();
-        }
-        $('#partnershipTable tbody').empty();
-        
-        $('#partnershipTable').DataTable({
-            data: data,
-            columns: [
-                { data: 'player', className: 'fw-bold clickable-player', render: d => `<span class="clickable-player">${d}</span>` },
-                { data: 'gamesInCommon', className: 'text-center' },
-                { data: 'sameTeam', className: 'text-center' },
-                { data: 'oppositeTeam', className: 'text-center', render: d => d > 0 ? d : '-' },
-                { data: 'winPercentTogether', className: 'text-center', render: (d, t, row) => row.sameTeam > 0 ? `${d}%` : '-' },
-                { data: 'h2hWinPercent', className: 'text-center', render: (d, t, row) => row.oppositeTeam > 0 ? `${d}%` : '-' }
-            ],
-            paging: false,
-            searching: false,
-            info: false,
-            ordering: true,
-            order: [[1, 'desc']],
-            responsive: true,
-            createdRow: function(row, data) {
-                if(data.sameTeam > 0 && data.winPercentTogether >= 60) $(row).find('td:eq(4)').addClass('table-success-light');
-                if(data.sameTeam > 0 && data.winPercentTogether <= 30) $(row).find('td:eq(4)').addClass('table-danger-light');
-                if(data.oppositeTeam > 0 && data.h2hWinPercent >= 60) $(row).find('td:eq(5)').addClass('table-success-light');
-                if(data.oppositeTeam > 0 && data.h2hWinPercent <= 30) $(row).find('td:eq(5)').addClass('table-danger-light');
-            }
-        });
-
-        $('#partnershipTable tbody').off('click', 'span.clickable-player').on('click', 'span.clickable-player', (event) => {
-            const playerName = $(event.target).text().trim();
-            if (playerName && this.players.includes(playerName)) this.selectPlayer(playerName);
-        });
-    }
-    
-    updateLastUpdated() {
-        fetch('GameLog.csv', { method: 'HEAD' })
-            .then(res => {
-                const lastModified = res.headers.get('last-modified');
-                $('#lastUpdated').text(lastModified ? new Date(lastModified).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'));
-            })
-            .catch(() => $('#lastUpdated').text(new Date().toLocaleDateString('en-GB')));
-    }
-    
-    showLoading(show) { $('#loadingIndicator').toggle(show); }
-    showError(msg) { $('.container').prepend(`<div class="alert alert-danger"><strong>Error:</strong> ${msg}</div>`); }
-}
-
-new SidewindersStats();
