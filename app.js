@@ -1,4 +1,4 @@
-// Sidewinders Stats - v3.0 Production Build
+// Sidewinders Stats - v3.1 GitHub Pages Stable Build
 class SidewindersStats {
     constructor() {
         this.gameLog = [];
@@ -8,12 +8,11 @@ class SidewindersStats {
         this.MIN_GAMES_THRESHOLD = 3; 
         
         $(document).ready(() => {
-            // EXPLICIT FIX: Bind the instance to the window so index.html can communicate with it
+            // Global attachment fix to allow index.html to hook into calculations
             window.sidewindersApp = this; 
             this.init();
         });
     }
-    // ... rest of the code remains exactly the same
     
     async init() {
         try {
@@ -65,7 +64,7 @@ class SidewindersStats {
             const stats = playerStats[player];
             stats.Games++;
             
-            const result = game['Result'];
+            const result = game['Result'] ? game['Result'].trim() : '';
             if (result === 'Win') {
                 stats.Wins++;
                 stats.TotalPoints += 3;
@@ -93,7 +92,9 @@ class SidewindersStats {
     }
     
     async fetchCSV(filename) {
-        const response = await fetch(filename);
+        // Appending a timestamp query string bypasses destructive aggressive GitHub Pages caching
+        const cacheBuster = `?t=${new Date().getTime()}`;
+        const response = await fetch(filename + cacheBuster);
         if (!response.ok) throw new Error(`HTTP Error Status: ${response.status}`);
         return await response.text();
     }
@@ -101,7 +102,6 @@ class SidewindersStats {
     parseCSV(csvText) {
         if (!csvText || csvText.trim() === '') return [];
         
-        // Defensive Fix: Cleans out carriage returns and trailing lines cleanly before operations
         const cleanText = csvText.replace(/\r/g, "").trim();
         const lines = cleanText.split('\n').filter(line => line.trim() !== '');
         if (lines.length < 2) return [];
@@ -155,7 +155,6 @@ class SidewindersStats {
             $('#leagueTable').DataTable().destroy();
         }
         
-        // Filter elements based on UI Game Floor configuration settings
         const shouldFilter = $('#filterMinGames').is(':checked');
         const runningDataset = shouldFilter 
             ? this.leagueTable.filter(p => p.Games >= this.MIN_GAMES_THRESHOLD)
@@ -181,7 +180,7 @@ class SidewindersStats {
             }}
         ];
         
-        const table = $('#leagueTable').DataTable({
+        $('#leagueTable').DataTable({
             data: runningDataset,
             columns: columns,
             order: [[9, 'desc']], 
@@ -190,7 +189,7 @@ class SidewindersStats {
             stateSave: true
         });
         
-        $('#leagueTable tbody').off('click', 'td:first-child').on('click', 'td:first-child', (event) => {
+        $('#leagueTable tbody').off('click', 'span.clickable-player').on('click', 'span.clickable-player', (event) => {
             const playerName = $(event.target).text().trim();
             if (playerName && this.players.includes(playerName)) {
                 this.selectPlayer(playerName);
@@ -264,7 +263,6 @@ class SidewindersStats {
             $('#winPercent').text(playerStats.WinPercent + '%');
             $('#winPercentBar').css('width', playerStats.WinPercent + '%');
             
-            // Calculate and display historical form markers
             this.renderFormBadges(playerName);
         }
         
@@ -275,10 +273,11 @@ class SidewindersStats {
     }
 
     renderFormBadges(playerName) {
-        // Collect, chronological match history filtering for isolated target entity
         const playerMatches = this.gameLog
-            .filter(game => game['Player'] === playerName)
-            .reverse(); // Standard arrays pull oldest first, reversing aligns newest first
+            .filter(game => game['Player'] === playerName);
+
+        // Sort by ID numeric value descending to ensure chronologically correct recent form
+        playerMatches.sort((a, b) => (parseInt(b['ID']) || 0) - (parseInt(a['ID']) || 0));
 
         const lastFive = playerMatches.slice(0, 5);
         const container = $('#playerFormBadges').empty();
@@ -289,13 +288,13 @@ class SidewindersStats {
         }
 
         lastFive.forEach(match => {
-            const res = match['Result'];
+            const res = match['Result'] ? match['Result'].trim() : '';
             let badgeColor = 'bg-secondary';
             if (res === 'Win') badgeColor = 'bg-success';
             if (res === 'Draw') badgeColor = 'bg-warning';
             if (res === 'Loss') badgeColor = 'bg-danger';
 
-            container.append(`<span class="form-badge ${badgeColor}" title="${match['Date'] || 'Unknown'}">${res[0]}</span>`);
+            container.append(`<span class="form-badge ${badgeColor}" title="Match ${match['ID']} | ${match['Date'] || ''}">${res[0] || '?'}</span>`);
         });
     }
     
@@ -311,15 +310,15 @@ class SidewindersStats {
             let gamesInCommon = 0, sameTeamGames = 0, winTogether = 0, oppositeTeamGames = 0, selectedWinsVsOther = 0;
             
             const selectedGameMap = {};
-            selectedGames.forEach(g => { selectedGameMap[g['ID'] + '|' + g['Team']] = g; });
+            selectedGames.forEach(g => { selectedGameMap[g['ID'] + '|' + (g['Team'] ? g['Team'].trim() : '')] = g; });
             
             const otherGameMap = {};
-            otherGames.forEach(g => { otherGameMap[g['ID'] + '|' + g['Team']] = g; });
+            otherGames.forEach(g => { otherGameMap[g['ID'] + '|' + (g['Team'] ? g['Team'].trim() : '')] = g; });
             
             Object.keys(selectedGameMap).forEach(key => {
                 if (otherGameMap[key]) {
                     gamesInCommon++; sameTeamGames++;
-                    if (selectedGameMap[key]['Result'] === 'Win') winTogether++;
+                    if (selectedGameMap[key]['Result'] && selectedGameMap[key]['Result'].trim() === 'Win') winTogether++;
                 }
             });
             
@@ -327,7 +326,7 @@ class SidewindersStats {
                 otherGames.forEach(oGame => {
                     if (sGame['ID'] === oGame['ID'] && sGame['Team'] !== oGame['Team']) {
                         gamesInCommon++; oppositeTeamGames++;
-                        if (sGame['Result'] === 'Win') selectedWinsVsOther++;
+                        if (sGame['Result'] && sGame['Result'].trim() === 'Win') selectedWinsVsOther++;
                     }
                 });
             });
@@ -353,7 +352,6 @@ class SidewindersStats {
         }
         $('#partnershipTable tbody').empty();
         
-        // Native architectural fix: Let DataTables safely manipulate arrays and draw elements itself 
         $('#partnershipTable').DataTable({
             data: data,
             columns: [
@@ -378,7 +376,7 @@ class SidewindersStats {
             }
         });
 
-        $('#partnershipTable tbody').off('click', 'td:first-child').on('click', 'td:first-child', (event) => {
+        $('#partnershipTable tbody').off('click', 'span.clickable-player').on('click', 'span.clickable-player', (event) => {
             const playerName = $(event.target).text().trim();
             if (playerName && this.players.includes(playerName)) this.selectPlayer(playerName);
         });
@@ -396,3 +394,6 @@ class SidewindersStats {
     showLoading(show) { $('#loadingIndicator').toggle(show); }
     showError(msg) { $('.container').prepend(`<div class="alert alert-danger"><strong>Error:</strong> ${msg}</div>`); }
 }
+
+// Ingest initialization handler
+new SidewindersStats();
