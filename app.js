@@ -5,12 +5,15 @@ class SidewindersStats {
         this.leagueTable = [];
         this.players = [];
         this.selectedPlayer = null;
-        this.MIN_GAMES_THRESHOLD = 3; // Rule 2 minimum threshold logic variable
+        this.MIN_GAMES_THRESHOLD = 3; 
         
         $(document).ready(() => {
+            // EXPLICIT FIX: Bind the instance to the window so index.html can communicate with it
+            window.sidewindersApp = this; 
             this.init();
         });
     }
+    // ... rest of the code remains exactly the same
     
     async init() {
         try {
