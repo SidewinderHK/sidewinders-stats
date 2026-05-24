@@ -1,4 +1,4 @@
-// Sidewinders Stats - Corrected Initialization Matrix
+// Sidewinders Stats - Fail-Safe Analytics Core
 class SidewindersStats {
     constructor() {
         this.gameLog = [];
@@ -6,7 +6,7 @@ class SidewindersStats {
         this.players = [];
         this.selectedPlayer = null;
         
-        // Explicitly define team sheet slots on the constructor to avoid early look-up crashes
+        // Explicitly define team sheet variables early to prevent look-up crashes
         this.currentWhiteTeam = [];
         this.currentColourTeam = [];
         
@@ -27,8 +27,8 @@ class SidewindersStats {
             this.showLoading(false);
             
         } catch (error) {
-            console.error('Initialization error:', error);
-            this.showError('Failed to load data. Please check GameLog.csv file.');
+            console.error('Initialization error encountered:', error);
+            this.showError('Failed to load data. Please check GameLog.csv file alignment.');
             this.showLoading(false);
         }
     }
@@ -38,12 +38,13 @@ class SidewindersStats {
             const gameLogCSV = await this.fetchCSV('GameLog.csv');
             this.gameLog = this.parseCSV(gameLogCSV);
             
+            // Collect unique player names safely
             this.players = [...new Set(this.gameLog.map(row => row['Player']))]
                 .filter(name => name && name.trim() !== '')
                 .sort();
             
-            console.log(`Loaded ${this.gameLog.length} game records`);
-            console.log(`Found ${this.players.length} unique players`);
+            console.log(`Loaded ${this.gameLog.length} clean game records`);
+            console.log(`Found ${this.players.length} unique active players`);
             
         } catch (error) {
             console.error('Error loading CSV file:', error);
@@ -74,14 +75,14 @@ class SidewindersStats {
             const stats = playerStats[player];
             stats.Played += 1;
             
-            const result = row['Result'] ? row['Result'].trim().toLowerCase() : '';
-            if (result === 'win' || result === 'win ') {
+            const result = row['Result'] ? row['Result'].toLowerCase() : '';
+            if (result === 'win') {
                 stats.Wins += 1;
                 stats.TotalPoints += 3;
-            } else if (result === 'draw' || result === 'draw ') {
+            } else if (result === 'draw') {
                 stats.Draws += 1;
                 stats.TotalPoints += 1;
-            } else if (result === 'loss' || result === 'loss ') {
+            } else if (result === 'loss') {
                 stats.Losses += 1;
             }
             
@@ -95,6 +96,7 @@ class SidewindersStats {
             return player;
         });
         
+        // Sorting precedence rule logic (Pts -> Gls -> Ast)
         this.leagueTable.sort((a, b) => {
             if (b.TotalPoints !== a.TotalPoints) return b.TotalPoints - a.TotalPoints;
             if (b.Goals !== a.Goals) return b.Goals - a.Goals;
@@ -109,9 +111,12 @@ class SidewindersStats {
         
         this.leagueTable.forEach((row, index) => {
             const tr = document.createElement('tr');
+            // Safely escape quotes and dynamic arguments for the inline click trigger
+            const safePlayerName = row.Player.replace(/'/g, "\\'");
+            
             tr.innerHTML = `
                 <td class="text-center fw-bold text-muted">${index + 1}</td>
-                <td class="clickable-player text-capitalize" onclick="window.sidewindersApp.selectPlayerFromTable('${row.Player.replace(/'/g, "\\'")}')">
+                <td class="clickable-player text-capitalize" onclick="window.sidewindersApp.selectPlayerFromTable('${safePlayerName}')">
                     <strong>${row.Player}</strong>
                 </td>
                 <td class="text-center">${row.Played}</td>
@@ -311,7 +316,7 @@ class SidewindersStats {
                         <strong class="me-auto">Success!</strong>
                         <button type="button" class="btn-close btn-close-white" onclick="this.parentElement.parentElement.remove()"></button>
                     </div>
-                    <div class="toast-body">Team Sheet copied to clipboard!</div>
+                    <div class="toast-body">Team Sheet copied to clipboard in WhatsApp format!</div>
                 </div>`;
                 $('body').append(toast);
                 setTimeout(() => $('.toast').fadeOut(400, function() { $(this).remove(); }), 3000);
@@ -371,10 +376,10 @@ class SidewindersStats {
             const div = document.createElement('div');
             div.className = 'list-group-item d-flex justify-content-between align-items-center py-2';
             
-            const team = row['Team'] ? row['Team'].trim() : 'White';
+            const team = row['Team'] ? row['Team'] : 'White';
             const badgeClass = team.toLowerCase() === 'white' ? 'bg-light text-dark border' : 'bg-primary text-white';
             
-            const result = row['Result'] ? row['Result'].trim().toUpperCase() : 'UNKNOWN';
+            const result = row['Result'] ? row['Result'].toUpperCase() : 'UNKNOWN';
             let resultBadgeClass = 'bg-secondary';
             if (result === 'WIN') resultBadgeClass = 'bg-success';
             if (result === 'LOSS') resultBadgeClass = 'bg-danger';
@@ -412,13 +417,16 @@ class SidewindersStats {
         const result = [];
         if (lines.length === 0 || !lines[0]) return result;
         
-        const headers = lines[0].split(',').map(h => h.trim());
+        // Clean up byte order marks and white space from columns
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^\uFEFF/, ''));
         
         for (let i = 1; i < lines.length; i++) {
             if (!lines[i].trim()) continue;
             const currentline = lines[i].split(',');
             const row = {};
+            
             headers.forEach((header, index) => {
+                // FORCE COMPLETE TRIM REMOVAL OF LEADING/TRAILING BLANK SPACES FROM CSV VALUES
                 row[header] = currentline[index] ? currentline[index].trim() : '';
             });
             result.push(row);
@@ -443,7 +451,7 @@ class SidewindersStats {
     }
 }
 
-// Global anchor routing configurations 
+// Global anchor scroll transitions configuration
 $(document).ready(function() {
     $('a[href="#league"]').click(function(e) {
         e.preventDefault();
@@ -478,12 +486,12 @@ function shareCurrentPlayer() {
                     <strong class="me-auto">Success!</strong>
                     <button type="button" class="btn-close btn-close-white" onclick="this.parentElement.parentElement.remove()"></button>
                 </div>
-                <div class="toast-body">Link to ${playerName}'s analysis copied!</div>
+                <div class="toast-body">Link to ${playerName}'s analysis copied to clipboard!</div>
             </div>`;
             $('body').append(toast);
             setTimeout(() => $('.toast').fadeOut(400, function() { $(this).remove(); }), 3000);
         })
-        .catch(err => { alert('Failed to copy link automatically.'); });
+        .catch(err => { alert('Failed to copy link references automatically.'); });
 }
 
 window.sidewindersApp = new SidewindersStats();
