@@ -1,13 +1,16 @@
-// Sidewinders Stats - v3.2 GitHub Pages Bulletproof Build
+// Sidewinders Stats - v3.3 GitHub Pages Default-Off Fix
 class SidewindersStats {
     constructor() {
         this.gameLog = [];
         this.leagueTable = [];
         this.players = [];
         this.selectedPlayer = null;
-        this.MIN_GAMES_THRESHOLD = 5; // CHANGED: Updated target threshold logic limit from 3 to 5
+        this.MIN_GAMES_THRESHOLD = 5; // Configured minimum threshold
         
         $(document).ready(() => {
+            // FORCE FIX: Explicitly uncheck the toggle on fresh loads to break browser state cache
+            $('#filterMinGames').prop('checked', false);
+            
             window.sidewindersApp = this; 
             this.init();
         });
