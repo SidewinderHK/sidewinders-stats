@@ -167,32 +167,33 @@ class SidewindersStats {
     }
     
     parseCSVLine(line) {
-        const values = [];
-        let currentValue = '';
-        let insideQuotes = false;
+    const values = [];
+    let currentValue = '';
+    let insideQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
         
-        for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            const nextChar = line[i + 1];
-            
-            if (char === '"') {
-                if (insideQuotes && nextChar === '"') {
-                    currentValue += '"';
-                    i++;
-                } else {
-                    insideQuotes = !insideQuotes;
-                }
-            } else if (char === ',' && !insideQuotes) {
-                values.push(currentValue);
-                currentValue = '';
+        if (char === '"') {
+            // Handle escaped quotes inside a quoted string safely
+            if (insideQuotes && i + 1 < line.length && line[i + 1] === '"') {
+                currentValue += '"';
+                i++; // Safe advance
             } else {
-                currentValue += char;
+                insideQuotes = !insideQuotes;
             }
+        } else if (char === ',' && !insideQuotes) {
+            values.push(currentValue);
+            currentValue = '';
+        } else {
+            currentValue += char;
         }
-        
-        values.push(currentValue);
-        return values;
     }
+    
+    // Push the final field remaining on the line
+    values.push(currentValue);
+    return values;
+}
     
     initLeagueTable() {
         if (this.leagueTable.length === 0) {
