@@ -1,0 +1,395 @@
+// Sidewinders Stats - v3.0 Production Build
+class SidewindersStats {
+    constructor() {
+        this.gameLog = [];
+        this.leagueTable = [];
+        this.players = [];
+        this.selectedPlayer = null;
+        this.MIN_GAMES_THRESHOLD = 3; // Rule 2 minimum threshold logic variable
+        
+        $(document).ready(() => {
+            this.init();
+        });
+    }
+    
+    async init() {
+        try {
+            this.showLoading(true);
+            await this.loadAllData();
+            this.calculateLeagueTable();
+            this.initLeagueTable();
+            this.initPlayerSelector();
+            this.updateLastUpdated();
+            this.showLoading(false);
+        } catch (error) {
+            console.error('Initialization error:', error);
+            this.showError('Failed to load data. Please verify your GameLog.csv configuration.');
+            this.showLoading(false);
+        }
+    }
+    
+    async loadAllData() {
+        try {
+            const gameLogCSV = await this.fetchCSV('GameLog.csv');
+            this.gameLog = this.parseCSV(gameLogCSV);
+            
+            this.players = [...new Set(this.gameLog.map(row => row['Player']))]
+                .filter(name => name && name.trim() !== '')
+                .sort();
+            
+            console.log(`Loaded ${this.gameLog.length} verified records.`);
+        } catch (error) {
+            console.error('Error handling data ingestion pipeline:', error);
+            throw error;
+        }
+    }
+    
+    calculateLeagueTable() {
+        const playerStats = {};
+        
+        this.players.forEach(player => {
+            playerStats[player] = {
+                Player: player, Games: 0, Wins: 0, Draws: 0, Losses: 0,
+                Goals: 0, OwnGoals: 0, Assists: 0, Penalties: 0, TotalPoints: 0,
+                PPG: 0, WinPercent: 0
+            };
+        });
+        
+        this.gameLog.forEach(game => {
+            const player = game['Player'];
+            if (!player || !playerStats[player]) return;
+            
+            const stats = playerStats[player];
+            stats.Games++;
+            
+            const result = game['Result'];
+            if (result === 'Win') {
+                stats.Wins++;
+                stats.TotalPoints += 3;
+            } else if (result === 'Draw') {
+                stats.Draws++;
+                stats.TotalPoints += 1;
+            } else if (result === 'Loss') {
+                stats.Losses++;
+            }
+            
+            stats.Goals += parseInt(game['Gls']) || 0;
+            stats.OwnGoals += parseInt(game['OG']) || 0;
+            stats.Assists += parseInt(game['Ast']) || 0;
+            stats.Penalties += parseInt(game['Pen']) || 0;
+        });
+        
+        Object.values(playerStats).forEach(stats => {
+            if (stats.Games > 0) {
+                stats.PPG = Math.round((stats.TotalPoints / stats.Games) * 10) / 10;
+                stats.WinPercent = Math.round((stats.Wins / stats.Games) * 100 * 10) / 10;
+            }
+        });
+        
+        this.leagueTable = Object.values(playerStats);
+    }
+    
+    async fetchCSV(filename) {
+        const response = await fetch(filename);
+        if (!response.ok) throw new Error(`HTTP Error Status: ${response.status}`);
+        return await response.text();
+    }
+    
+    parseCSV(csvText) {
+        if (!csvText || csvText.trim() === '') return [];
+        
+        // Defensive Fix: Cleans out carriage returns and trailing lines cleanly before operations
+        const cleanText = csvText.replace(/\r/g, "").trim();
+        const lines = cleanText.split('\n').filter(line => line.trim() !== '');
+        if (lines.length < 2) return [];
+        
+        const headers = this.parseCSVLine(lines[0]).map(h => h.replace(/^"(.*)"$/, '$1').trim());
+        const data = [];
+        
+        for (let i = 1; i < lines.length; i++) {
+            const values = this.parseCSVLine(lines[i]);
+            if (values.length === 0) continue;
+            
+            const row = {};
+            headers.forEach((header, index) => {
+                if (values[index] !== undefined) {
+                    let value = values[index].replace(/^"(.*)"$/, '$1').trim();
+                    const numericColumns = ['Gls', 'OG', 'Ast', 'Pen'];
+                    if (numericColumns.includes(header) && !isNaN(value) && value !== '') {
+                        value = Number(value);
+                    }
+                    row[header] = value;
+                }
+            });
+            if (Object.keys(row).length > 0 && row[headers[0]]) {
+                data.push(row);
+            }
+        }
+        return data;
+    }
+    
+    parseCSVLine(line) {
+        const values = [];
+        let currentValue = '';
+        let insideQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            const nextChar = line[i + 1];
+            if (char === '"') {
+                if (insideQuotes && nextChar === '"') { currentValue += '"'; i++; } 
+                else { insideQuotes = !insideQuotes; }
+            } else if (char === ',' && !insideQuotes) {
+                values.push(currentValue);
+                currentValue = '';
+            } else { currentValue += char; }
+        }
+        values.push(currentValue);
+        return values;
+    }
+    
+    initLeagueTable() {
+        if ($.fn.DataTable.isDataTable('#leagueTable')) {
+            $('#leagueTable').DataTable().destroy();
+        }
+        
+        // Filter elements based on UI Game Floor configuration settings
+        const shouldFilter = $('#filterMinGames').is(':checked');
+        const runningDataset = shouldFilter 
+            ? this.leagueTable.filter(p => p.Games >= this.MIN_GAMES_THRESHOLD)
+            : this.leagueTable;
+
+        const columns = [
+            { data: 'Player', className: 'fw-bold clickable-player', render: data => `<span class="clickable-player">${data}</span>` },
+            { data: 'Games', className: 'text-center' },
+            { data: 'Wins', className: 'text-center' },
+            { data: 'Draws', className: 'text-center' },
+            { data: 'Losses', className: 'text-center' },
+            { data: 'Goals', className: 'text-center fw-bold text-primary', render: data => `<span class="goals-highlight">${data}</span>` },
+            { data: 'OwnGoals', className: 'text-center' },
+            { data: 'Assists', className: 'text-center' },
+            { data: 'Penalties', className: 'text-center' },
+            { data: 'TotalPoints', className: 'text-center fw-bold text-success', render: data => `<strong class="points-badge">${data}</strong>` },
+            { data: 'PPG', className: 'text-center fw-bold', render: data => `<span class="ppg-value">${data.toFixed(1)}</span>` },
+            { data: 'WinPercent', className: 'text-center', render: data => {
+                let color = '#dc3545';
+                if (data >= 60) color = '#198754';
+                else if (data >= 40) color = '#fd7e14';
+                return `<span style="color: ${color}; font-weight: bold">${data}%</span>`;
+            }}
+        ];
+        
+        const table = $('#leagueTable').DataTable({
+            data: runningDataset,
+            columns: columns,
+            order: [[9, 'desc']], 
+            pageLength: 25,
+            responsive: true,
+            stateSave: true
+        });
+        
+        $('#leagueTable tbody').off('click', 'td:first-child').on('click', 'td:first-child', (event) => {
+            const playerName = $(event.target).text().trim();
+            if (playerName && this.players.includes(playerName)) {
+                this.selectPlayer(playerName);
+                $('html, body').animate({ scrollTop: $('#analysis').offset().top - 20 }, 500);
+            }
+        });
+        
+        this.addQuickSortButtons();
+    }
+    
+    addQuickSortButtons() {
+        $('#quickSortButtons').remove();
+        const quickSortHtml = `
+            <div id="quickSortButtons" class="mb-3">
+                <div class="btn-group" role="group">
+                    <button class="btn btn-outline-primary btn-sm sort-btn active" data-sort="9" data-order="desc"><i class="fas fa-trophy me-1"></i> Points</button>
+                    <button class="btn btn-outline-primary btn-sm sort-btn" data-sort="10" data-order="desc"><i class="fas fa-chart-line me-1"></i> PPG</button>
+                    <button class="btn btn-outline-primary btn-sm sort-btn" data-sort="5" data-order="desc"><i class="fas fa-futbol me-1"></i> Goals</button>
+                    <button class="btn btn-outline-primary btn-sm sort-btn" data-sort="7" data-order="desc"><i class="fas fa-handshake me-1"></i> Assists</button>
+                    <button class="btn btn-outline-primary btn-sm sort-btn" data-sort="11" data-order="desc"><i class="fas fa-percentage me-1"></i> Win %</button>
+                </div>
+            </div>`;
+        
+        $('#leagueTable_wrapper').prepend(quickSortHtml);
+        $('.sort-btn').on('click', (e) => {
+            const button = $(e.currentTarget);
+            const columnIndex = parseInt(button.data('sort'));
+            const order = button.data('order');
+            const table = $('#leagueTable').DataTable();
+            
+            $('.sort-btn').removeClass('active');
+            button.addClass('active');
+            table.order([columnIndex, order]).draw();
+        });
+    }
+    
+    resetSorting() {
+        const table = $('#leagueTable').DataTable();
+        table.order([[9, 'desc']]).draw();
+        $('.sort-btn').removeClass('active');
+        $('.sort-btn[data-sort="9"]').addClass('active');
+    }
+    
+    initPlayerSelector() {
+        const select = $('#playerSelect');
+        select.empty().append('<option value="">Choose a player...</option>');
+        this.players.forEach(player => select.append(`<option value="${player}">${player}</option>`));
+        select.off('change').on('change', (e) => { if (e.target.value) this.selectPlayer(e.target.value); });
+    }
+    
+    selectPlayer(playerName) {
+        this.selectedPlayer = playerName;
+        $('#playerSelect').val(playerName);
+        this.showPlayerAnalysis(playerName);
+    }
+    
+    showPlayerAnalysis(playerName) {
+        $('#playerName').text(playerName);
+        const playerStats = this.leagueTable.find(row => row.Player === playerName);
+        
+        if (playerStats) {
+            $('#totalGames').text(playerStats.Games);
+            $('#totalWins').text(playerStats.Wins);
+            $('#totalDraws').text(playerStats.Draws);
+            $('#totalLosses').text(playerStats.Losses);
+            $('#totalPoints').text(playerStats.TotalPoints);
+            $('#totalGoals').text(playerStats.Goals);
+            $('#totalAssists').text(playerStats.Assists);
+            $('#totalOwnGoals').text(playerStats.OwnGoals);
+            $('#goalContributions').text(playerStats.Goals + playerStats.Assists);
+            $('#winPercent').text(playerStats.WinPercent + '%');
+            $('#winPercentBar').css('width', playerStats.WinPercent + '%');
+            
+            // Calculate and display historical form markers
+            this.renderFormBadges(playerName);
+        }
+        
+        $('#playerStats').show();
+        $('#shareButton').prop('disabled', false);
+        
+        this.calculateAndRenderPartnerships(playerName);
+    }
+
+    renderFormBadges(playerName) {
+        // Collect, chronological match history filtering for isolated target entity
+        const playerMatches = this.gameLog
+            .filter(game => game['Player'] === playerName)
+            .reverse(); // Standard arrays pull oldest first, reversing aligns newest first
+
+        const lastFive = playerMatches.slice(0, 5);
+        const container = $('#playerFormBadges').empty();
+
+        if(lastFive.length === 0) {
+            container.text('-');
+            return;
+        }
+
+        lastFive.forEach(match => {
+            const res = match['Result'];
+            let badgeColor = 'bg-secondary';
+            if (res === 'Win') badgeColor = 'bg-success';
+            if (res === 'Draw') badgeColor = 'bg-warning';
+            if (res === 'Loss') badgeColor = 'bg-danger';
+
+            container.append(`<span class="form-badge ${badgeColor}" title="${match['Date'] || 'Unknown'}">${res[0]}</span>`);
+        });
+    }
+    
+    calculateAndRenderPartnerships(selectedPlayer) {
+        const analysisData = [];
+        
+        this.players.forEach(otherPlayer => {
+            if (otherPlayer === selectedPlayer) return;
+            
+            const selectedGames = this.gameLog.filter(game => game['Player'] === selectedPlayer);
+            const otherGames = this.gameLog.filter(game => game['Player'] === otherPlayer);
+            
+            let gamesInCommon = 0, sameTeamGames = 0, winTogether = 0, oppositeTeamGames = 0, selectedWinsVsOther = 0;
+            
+            const selectedGameMap = {};
+            selectedGames.forEach(g => { selectedGameMap[g['ID'] + '|' + g['Team']] = g; });
+            
+            const otherGameMap = {};
+            otherGames.forEach(g => { otherGameMap[g['ID'] + '|' + g['Team']] = g; });
+            
+            Object.keys(selectedGameMap).forEach(key => {
+                if (otherGameMap[key]) {
+                    gamesInCommon++; sameTeamGames++;
+                    if (selectedGameMap[key]['Result'] === 'Win') winTogether++;
+                }
+            });
+            
+            selectedGames.forEach(sGame => {
+                otherGames.forEach(oGame => {
+                    if (sGame['ID'] === oGame['ID'] && sGame['Team'] !== oGame['Team']) {
+                        gamesInCommon++; oppositeTeamGames++;
+                        if (sGame['Result'] === 'Win') selectedWinsVsOther++;
+                    }
+                });
+            });
+            
+            if (gamesInCommon > 0) {
+                analysisData.push({
+                    player: otherPlayer,
+                    gamesInCommon: gamesInCommon,
+                    sameTeam: sameTeamGames,
+                    oppositeTeam: oppositeTeamGames,
+                    winPercentTogether: sameTeamGames > 0 ? Math.round((winTogether / sameTeamGames) * 100) : 0,
+                    h2hWinPercent: oppositeTeamGames > 0 ? Math.round((selectedWinsVsOther / oppositeTeamGames) * 100) : 0
+                });
+            }
+        });
+        
+        this.initPartnershipDataTable(analysisData);
+    }
+    
+    initPartnershipDataTable(data) {
+        if ($.fn.DataTable.isDataTable('#partnershipTable')) {
+            $('#partnershipTable').DataTable().destroy();
+        }
+        $('#partnershipTable tbody').empty();
+        
+        // Native architectural fix: Let DataTables safely manipulate arrays and draw elements itself 
+        $('#partnershipTable').DataTable({
+            data: data,
+            columns: [
+                { data: 'player', className: 'fw-bold clickable-player', render: d => `<span class="clickable-player">${d}</span>` },
+                { data: 'gamesInCommon', className: 'text-center' },
+                { data: 'sameTeam', className: 'text-center' },
+                { data: 'oppositeTeam', className: 'text-center', render: d => d > 0 ? d : '-' },
+                { data: 'winPercentTogether', className: 'text-center', render: (d, t, row) => row.sameTeam > 0 ? `${d}%` : '-' },
+                { data: 'h2hWinPercent', className: 'text-center', render: (d, t, row) => row.oppositeTeam > 0 ? `${d}%` : '-' }
+            ],
+            paging: false,
+            searching: false,
+            info: false,
+            ordering: true,
+            order: [[1, 'desc']],
+            responsive: true,
+            createdRow: function(row, data) {
+                if(data.sameTeam > 0 && data.winPercentTogether >= 60) $(row).find('td:eq(4)').addClass('table-success-light');
+                if(data.sameTeam > 0 && data.winPercentTogether <= 30) $(row).find('td:eq(4)').addClass('table-danger-light');
+                if(data.oppositeTeam > 0 && data.h2hWinPercent >= 60) $(row).find('td:eq(5)').addClass('table-success-light');
+                if(data.oppositeTeam > 0 && data.h2hWinPercent <= 30) $(row).find('td:eq(5)').addClass('table-danger-light');
+            }
+        });
+
+        $('#partnershipTable tbody').off('click', 'td:first-child').on('click', 'td:first-child', (event) => {
+            const playerName = $(event.target).text().trim();
+            if (playerName && this.players.includes(playerName)) this.selectPlayer(playerName);
+        });
+    }
+    
+    updateLastUpdated() {
+        fetch('GameLog.csv', { method: 'HEAD' })
+            .then(res => {
+                const lastModified = res.headers.get('last-modified');
+                $('#lastUpdated').text(lastModified ? new Date(lastModified).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'));
+            })
+            .catch(() => $('#lastUpdated').text(new Date().toLocaleDateString('en-GB')));
+    }
+    
+    showLoading(show) { $('#loadingIndicator').toggle(show); }
+    showError(msg) { $('.container').prepend(`<div class="alert alert-danger"><strong>Error:</strong> ${msg}</div>`); }
+}
