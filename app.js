@@ -93,8 +93,6 @@ class SidewindersStats {
             localStorage.setItem('sidewinders_extended_stats', isChecked);
             this.setExtendedStatsVisibility(isChecked);
         });
-        
-        // Optional: update on resize? Not needed; user override persists.
     }
     
     setExtendedStatsVisibility(show) {
