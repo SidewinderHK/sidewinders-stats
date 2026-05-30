@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sidewinders Football – Season Hub</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/3.2.4/css/fixedHeader.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary-color: #1e3a8a;
+            --secondary-color: #3b82f6;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --info-color: #0ea5e9;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding-bottom: 20px;
+        }
+        
+        .navbar {
+            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e5e7eb;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .section-title {
+            color: var(--primary-color);
+            font-weight: 700;
+            border-left: 4px solid var(--secondary-color);
+            padding-left: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .player-select {
+            max-width: 400px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 10px 15px;
+            font-size: 1rem;
+        }
+        
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            height: 100%;
+        }
+        
+        .card-title {
+            color: var(--primary-color);
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .clickable-player {
+            color: var(--secondary-color);
+            cursor: pointer;
+            font-weight: 600;
+        }
+        
+        .clickable-player:hover {
+            color: var(--primary-color);
+            text-decoration: underline;
+        }
+        
+        .table-success-light { background-color: rgba(16, 185, 129, 0.1) !important; }
+        .table-danger-light { background-color: rgba(239, 68, 68, 0.1) !important; }
+        
+        .footer {
+            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            padding: 20px 0;
+            margin-top: 40px;
+        }
+        
+        .points-badge {
+            background: linear-gradient(90deg, var(--success-color), #34d399);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        
+        .border-primary-left { border-left: 4px solid var(--primary-color) !important; }
+        .border-success-left { border-left: 4px solid var(--success-color) !important; }
+        .border-info-left { border-left: 4px solid var(--info-color) !important; }
+        .border-warning-left { border-left: 4px solid var(--warning-color) !important; }
+        .border-danger-left { border-left: 4px solid var(--danger-color) !important; }
+        .border-secondary-left { border-left: 4px solid #6b7280 !important; }
+        
+        .goals-highlight {
+            background: linear-gradient(90deg, #dbeafe, #e0e7ff);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+            color: #1e40af;
+        }
+        
+        .ppg-value, .gpg-value, .apg-value {
+            font-weight: 600;
+            color: #1e3a8a;
+            background: #e0e7ff;
+            padding: 3px 8px;
+            border-radius: 10px;
+            display: inline-block;
+        }
+        
+        .form-badge {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            line-height: 28px;
+            text-align: center;
+            border-radius: 50%;
+            font-weight: bold;
+            color: white;
+            margin-right: 4px;
+            font-size: 0.85rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        @media (max-width: 767px) {
+            .stat-card { padding: 15px; }
+            .points-badge, .ppg-value, .gpg-value, .apg-value { font-size: 0.85rem; padding: 2px 6px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="loadingIndicator" class="container mt-5 text-center">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-3 text-muted">Loading Sidewinders Football Statistics...</p>
+    </div>
+
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="#"><i class="fas fa-futbol me-2"></i> Sidewinders Stats</a>
+            <div class="ms-auto d-flex align-items-center gap-3">
+                <div class="dropdown">
+                    <button class="btn btn-outline-light dropdown-toggle" type="button" id="seasonDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-calendar-alt me-1"></i> <span id="currentSeasonLabel">2025-2026</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" id="seasonList">
+                        <li><a class="dropdown-item" data-season="current">🏆 2025-2026</a></li>
+                        <li><a class="dropdown-item" data-season="archive2526">📦 2025-2026 (Archived)</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" data-season="summer25">☀️ Summer 2025</a></li>
+                        <li><a class="dropdown-item" data-season="season2425">📅 2024-2025</a></li>
+                        <li><a class="dropdown-item" data-season="season2324">📅 2023-2024</a></li>
+                    </ul>
+                </div>
+                <ul class="navbar-nav flex-row gap-3">
+                    <li class="nav-item"><a class="nav-link text-white" href="#league"><i class="fas fa-table me-1"></i> Table</a></li>
+                    <li class="nav-item" id="analysisNavLink"><a class="nav-link text-white" href="#analysis"><i class="fas fa-chart-line me-1"></i> Analysis</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="stat-card text-center">
+                    <h1 class="display-6 fw-bold text-primary mb-2">🏆 Sidewinders Football Statistics</h1>
+                    <div><i class="fas fa-clock me-1"></i> Last updated: <span id="lastUpdated">Loading...</span></div>
+                </div>
+            </div>
+        </div>
+
+        <section id="league" class="mb-5">
+            <h2 class="section-title"><i class="fas fa-trophy me-2"></i> League Table</h2>
+            <div class="stat-card">
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                    <div class="d-flex gap-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="filterMinGames">
+                            <label class="form-check-label small fw-bold text-muted" for="filterMinGames">Min 5 Games</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="extendedStatsToggle">
+                            <label class="form-check-label small fw-bold text-muted" for="extendedStatsToggle">Extended Stats (GPG/APG/PPG/Win%)</label>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-primary" id="recalcBtn">Recalc</button>
+                        <button class="btn btn-sm btn-outline-info" id="resetSortBtn">Reset Sort</button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table id="leagueTable" class="table table-hover table-striped" style="width:100%">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Player</th>
+                                <th class="text-center">Games</th>
+                                <th class="text-center">Wins</th>
+                                <th class="text-center">Draws</th>
+                                <th class="text-center">Losses</th>
+                                <th class="text-center">Goals</th>
+                                <th class="text-center">Own Goals</th>
+                                <th class="text-center">Assists</th>
+                                <th class="text-center">Penalties</th>
+                                <th class="text-center">Total Points</th>
+                                <th class="text-center">GPG</th>
+                                <th class="text-center">APG</th>
+                                <th class="text-center">PPG</th>
+                                <th class="text-center">Win %</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="analysis" class="mb-5">
+            <h2 class="section-title"><i class="fas fa-chart-pie me-2"></i> Player Analysis</h2>
+            <div class="stat-card">
+                <h5>Select a Player to Analyze</h5>
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <select id="playerSelect" class="form-select player-select">
+                            <option value="">Choose a player...</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mt-2 mt-md-0">
+                        <button class="btn btn-primary w-100" id="shareButton" disabled>
+                            <i class="fas fa-share-alt me-1"></i> Share Analysis
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="playerStats" class="stat-card" style="display: none;">
+                <div class="mb-4">
+                    <h3 id="playerName" class="mb-0"></h3>
+                    <div class="mt-2" id="playerFormContainer">
+                        <span class="small text-muted me-2">Recent Form:</span>
+                        <div id="playerFormBadges" class="d-inline-block"></div>
+                    </div>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-md-2 col-sm-4 mb-3"><div class="card border-primary-left"><div class="card-body text-center"><h6 class="text-muted">Games</h6><h2 id="totalGames" class="text-primary">0</h2></div></div></div>
+                    <div class="col-md-2 col-sm-4 mb-3"><div class="card border-success-left"><div class="card-body text-center"><h6 class="text-muted">Points</h6><h2 id="totalPoints" class="text-success">0</h2></div></div></div>
+                    <div class="col-md-2 col-sm-4 mb-3"><div class="card border-info-left"><div class="card-body text-center"><h6 class="text-muted">Goals</h6><h2 id="totalGoals" class="text-info">0</h2></div></div></div>
+                    <div class="col-md-2 col-sm-4 mb-3"><div class="card border-warning-left"><div class="card-body text-center"><h6 class="text-muted">Assists</h6><h2 id="totalAssists" class="text-warning">0</h2></div></div></div>
+                    <div class="col-md-2 col-sm-4 mb-3"><div class="card border-danger-left"><div class="card-body text-center"><h6 class="text-muted">OGs</h6><h2 id="totalOwnGoals" class="text-danger">0</h2></div></div></div>
+                    <div class="col-md-2 col-sm-4 mb-3"><div class="card border-secondary-left"><div class="card-body text-center"><h6 class="text-muted">G+A</h6><h2 id="goalContributions" class="text-secondary">0</h2></div></div></div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3">
+                        <div class="card"><div class="card-body"><h6>Win/Loss Record</h6>
+                            <div class="d-flex justify-content-between text-center mt-2">
+                                <span class="text-success fw-bold">W: <span id="totalWins">0</span></span>
+                                <span class="text-warning fw-bold">D: <span id="totalDraws">0</span></span>
+                                <span class="text-danger fw-bold">L: <span id="totalLosses">0</span></span>
+                            </div>
+                        </div></div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card"><div class="card-body"><h6>Win Percentage</h6>
+                            <div class="d-flex align-items-center mt-2">
+                                <h4 id="winPercent" class="text-success me-3 mb-0">0%</h4>
+                                <div class="flex-grow-1"><div class="progress" style="height: 10px;"><div id="winPercentBar" class="progress-bar bg-success" style="width: 0%"></div></div></div>
+                            </div>
+                        </div></div>
+                    </div>
+                </div>
+                
+                <h5 class="mb-3"><i class="fas fa-handshake me-2"></i> Partnership Analysis</h5>
+                <div class="table-responsive">
+                    <table id="partnershipTable" class="table table-sm table-hover" style="width:100%">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Teammate</th>
+                                <th class="text-center">Games Together</th>
+                                <th class="text-center">Same Team</th>
+                                <th class="text-center">Opposite Team</th>
+                                <th class="text-center">Win % Together</th>
+                                <th class="text-center">H2H Win %</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <footer class="footer text-center"><div class="container"><small>Sidewinders Football Stats Hub • Multi‑season Archive</small></div></footer>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+    <script src="app.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                const hash = window.location.hash;
+                if (hash && hash.startsWith('#player-')) {
+                    const playerName = decodeURIComponent(hash.substring(8));
+                    if (window.sidewindersApp && window.sidewindersApp.players && window.sidewindersApp.players.includes(playerName)) {
+                        window.sidewindersApp.selectPlayer(playerName);
+                        $('html, body').animate({ scrollTop: $('#analysis').offset().top - 20 }, 500);
+                    }
+                }
+            }, 800);
+        });
+    </script>
+</body>
+</html>
