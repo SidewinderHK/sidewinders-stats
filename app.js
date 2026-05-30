@@ -1,4 +1,4 @@
-// Sidewinders Stats - Multi-Season Hub v6.0 (Extended Stats toggle)
+// Sidewinders Stats - Multi-Season Hub v6.1 (Clear season headings)
 class SidewindersStats {
     constructor() {
         this.gameLog = [];
@@ -10,13 +10,48 @@ class SidewindersStats {
         this.dataTable = null;
         this.extendedColumnsIndices = [10, 11, 12, 13]; // GPG, APG, PPG, Win%
         
-        // Season definitions
+        // Season definitions with display headings
         this.seasons = {
-            current: { name: "2025-2026", type: "full", file: "GameLog.csv", hasAnalysis: true, label: "2025-2026" },
-            archive2526: { name: "2025-2026 (Archived)", type: "full", file: "GameLog25.csv", hasAnalysis: true, label: "2025-2026 (Archived)" },
-            summer25: { name: "Summer 2025", type: "summary", file: "Summer25.csv", hasAnalysis: false, label: "Summer 2025" },
-            season2425: { name: "2024-2025", type: "summary", file: "Season24.csv", hasAnalysis: false, label: "2024-2025" },
-            season2324: { name: "2023-2024", type: "summary", file: "Season23.csv", hasAnalysis: false, label: "2023-2024" }
+            current: { 
+                name: "Current Season", 
+                type: "full", 
+                file: "GameLog.csv", 
+                hasAnalysis: true, 
+                label: "Current Season",
+                heading: "Current Season"
+            },
+            archive2526: { 
+                name: "2025/26 Season", 
+                type: "full", 
+                file: "GameLog25.csv", 
+                hasAnalysis: true, 
+                label: "2025/26 Season",
+                heading: "2025/26 Season"
+            },
+            summer25: { 
+                name: "Summer 2025", 
+                type: "summary", 
+                file: "Summer25.csv", 
+                hasAnalysis: false, 
+                label: "Summer 2025",
+                heading: "Summer 2025"
+            },
+            season2425: { 
+                name: "2024/25 Season", 
+                type: "summary", 
+                file: "Season24.csv", 
+                hasAnalysis: false, 
+                label: "2024/25 Season",
+                heading: "2024/25 Season"
+            },
+            season2324: { 
+                name: "2023/24 Season", 
+                type: "summary", 
+                file: "Season23.csv", 
+                hasAnalysis: false, 
+                label: "2023/24 Season",
+                heading: "2023/24 Season"
+            }
         };
         
         $(document).ready(() => {
@@ -106,7 +141,10 @@ class SidewindersStats {
     async loadSeason(seasonId) {
         this.currentSeason = seasonId;
         const season = this.seasons[seasonId];
+        
+        // Update dropdown button label and main heading
         $('#currentSeasonLabel').text(season.label);
+        $('#seasonHeading').text(season.heading);
         
         this.showLoading(true);
         
