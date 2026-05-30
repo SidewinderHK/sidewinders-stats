@@ -164,15 +164,15 @@
             <div class="ms-auto d-flex align-items-center gap-3">
                 <div class="dropdown">
                     <button class="btn btn-outline-light dropdown-toggle" type="button" id="seasonDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-calendar-alt me-1"></i> <span id="currentSeasonLabel">2025-2026</span>
+                        <i class="fas fa-calendar-alt me-1"></i> <span id="currentSeasonLabel">Current Season</span>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end" id="seasonList">
-                        <li><a class="dropdown-item" data-season="current">🏆 2025-2026</a></li>
-                        <li><a class="dropdown-item" data-season="archive2526">📦 2025-2026 (Archived)</a></li>
+                        <li><a class="dropdown-item" data-season="current">🏆 Current Season</a></li>
+                        <li><a class="dropdown-item" data-season="archive2526">📦 2025/26 Season</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" data-season="summer25">☀️ Summer 2025</a></li>
-                        <li><a class="dropdown-item" data-season="season2425">📅 2024-2025</a></li>
-                        <li><a class="dropdown-item" data-season="season2324">📅 2023-2024</a></li>
+                        <li><a class="dropdown-item" data-season="season2425">📅 2024/25 Season</a></li>
+                        <li><a class="dropdown-item" data-season="season2324">📅 2023/24 Season</a></li>
                     </ul>
                 </div>
                 <ul class="navbar-nav flex-row gap-3">
@@ -188,6 +188,7 @@
             <div class="col-12">
                 <div class="stat-card text-center">
                     <h1 class="display-6 fw-bold text-primary mb-2">🏆 Sidewinders Football Statistics</h1>
+                    <div id="seasonHeading" class="fw-bold text-secondary mb-1">Current Season</div>
                     <div><i class="fas fa-clock me-1"></i> Last updated: <span id="lastUpdated">Loading...</span></div>
                 </div>
             </div>
@@ -308,7 +309,7 @@
                             </tr>
                         </thead>
                         <tbody></tbody>
-                    <table>
+                    </table>
                 </div>
             </div>
         </section>
