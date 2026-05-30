@@ -1,18 +1,14 @@
-// Sidewinders Stats - v3.5 Persistent State-Buster Build
+// Sidewinders Stats - v4.0 Fixed Min Games Filter
 class SidewindersStats {
     constructor() {
         this.gameLog = [];
         this.leagueTable = [];
         this.players = [];
         this.selectedPlayer = null;
-        this.MIN_GAMES_THRESHOLD = 5; // Configured minimum threshold
+        this.MIN_GAMES_THRESHOLD = 5; // Minimum games required
         
         $(document).ready(() => {
-            // Force the checkbox toggle visually off on load
-            $('#filterMinGames').prop('checked', false);
-            
-            // Bind application scope immediately before async operations execute
-            window.sidewindersApp = this; 
+            window.sidewindersApp = this;
             this.init();
         });
     }
@@ -25,12 +21,31 @@ class SidewindersStats {
             this.initLeagueTable();
             this.initPlayerSelector();
             this.updateLastUpdated();
+            this.setupEventListeners();
             this.showLoading(false);
         } catch (error) {
             console.error('Initialization error:', error);
             this.showError('Failed to load data. Please verify your GameLog.csv configuration.');
             this.showLoading(false);
         }
+    }
+    
+    setupEventListeners() {
+        // Min games filter toggle
+        $('#filterMinGames').off('change').on('change', () => {
+            this.initLeagueTable();
+        });
+        
+        // Recalc button
+        $('.btn-outline-primary').off('click').on('click', () => {
+            this.calculateLeagueTable();
+            this.initLeagueTable();
+        });
+        
+        // Reset sort button
+        $('.btn-outline-info').off('click').on('click', () => {
+            this.resetSorting();
+        });
     }
     
     async loadAllData() {
@@ -42,9 +57,9 @@ class SidewindersStats {
                 .filter(name => name && name.trim() !== '')
                 .sort();
             
-            console.log(`Loaded ${this.gameLog.length} verified records.`);
+            console.log(`Loaded ${this.gameLog.length} records for ${this.players.length} players.`);
         } catch (error) {
-            console.error('Error handling data ingestion pipeline:', error);
+            console.error('Error loading data:', error);
             throw error;
         }
     }
@@ -97,7 +112,7 @@ class SidewindersStats {
     async fetchCSV(filename) {
         const cacheBuster = `?t=${new Date().getTime()}`;
         const response = await fetch(filename + cacheBuster);
-        if (!response.ok) throw new Error(`HTTP Error Status: ${response.status}`);
+        if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
         return await response.text();
     }
     
@@ -108,7 +123,7 @@ class SidewindersStats {
         const lines = cleanText.split('\n').filter(line => line.trim() !== '');
         if (lines.length < 2) return [];
         
-        const headers = this.parseCSVLine(lines[0]).map(h => h ? h.replace(/^"(.*)"$/, '$1').trim() : '');
+        const headers = this.parseCSVLine(lines[0]).map(h => h.replace(/^"(.*)"$/, '$1').trim());
         const data = [];
         
         for (let i = 1; i < lines.length; i++) {
@@ -141,12 +156,18 @@ class SidewindersStats {
             const char = line[i];
             const nextChar = line[i + 1];
             if (char === '"') {
-                if (insideQuotes && nextChar === '"') { currentValue += '"'; i++; } 
-                else { insideQuotes = !insideQuotes; }
+                if (insideQuotes && nextChar === '"') {
+                    currentValue += '"';
+                    i++;
+                } else {
+                    insideQuotes = !insideQuotes;
+                }
             } else if (char === ',' && !insideQuotes) {
                 values.push(currentValue);
                 currentValue = '';
-            } else { currentValue += char; }
+            } else {
+                currentValue += char;
+            }
         }
         values.push(currentValue);
         return values;
@@ -154,16 +175,31 @@ class SidewindersStats {
     
     initLeagueTable() {
         if ($.fn.DataTable.isDataTable('#leagueTable')) {
-            const tableInstance = $('#leagueTable').DataTable();
-            tableInstance.state.clear(); // Wipe residual memory fields
-            tableInstance.destroy();
+            $('#leagueTable').DataTable().destroy();
         }
         
         const shouldFilter = $('#filterMinGames').is(':checked');
+        // Force numeric comparison for Games
         const runningDataset = shouldFilter 
-            ? this.leagueTable.filter(p => p.Games >= this.MIN_GAMES_THRESHOLD)
-            : this.leagueTable;
-
+            ? this.leagueTable.filter(p => Number(p.Games) >= this.MIN_GAMES_THRESHOLD)
+            : [...this.leagueTable];
+        
+        // Update filter status display
+        const filterStatus = $('#filterStatus');
+        if (shouldFilter) {
+            const totalPlayers = this.leagueTable.length;
+            const shownPlayers = runningDataset.length;
+            if (!filterStatus.length) {
+                $('.d-flex.justify-content-between.align-items-center.mb-3').append(
+                    `<span id="filterStatus" class="badge bg-info ms-2">Filter: ${shownPlayers}/${totalPlayers} players (min ${this.MIN_GAMES_THRESHOLD} games)</span>`
+                );
+            } else {
+                filterStatus.text(`Filter: ${shownPlayers}/${totalPlayers} players (min ${this.MIN_GAMES_THRESHOLD} games)`);
+            }
+        } else {
+            $('#filterStatus').remove();
+        }
+        
         const columns = [
             { data: 'Player', className: 'fw-bold clickable-player', render: data => `<span class="clickable-player">${data}</span>` },
             { data: 'Games', className: 'text-center' },
@@ -187,12 +223,14 @@ class SidewindersStats {
         $('#leagueTable').DataTable({
             data: runningDataset,
             columns: columns,
-            order: [[9, 'desc']], 
+            order: [[9, 'desc']],
             pageLength: 25,
             responsive: true,
-            stateSave: false // CHANGED: Disabled state saving to block browser local storage overwrites
+            stateSave: false,
+            destroy: true
         });
         
+        // Rebind click handler for player names
         $('#leagueTable tbody').off('click', 'span.clickable-player').on('click', 'span.clickable-player', (event) => {
             const playerName = $(event.target).text().trim();
             if (playerName && this.players.includes(playerName)) {
@@ -218,7 +256,7 @@ class SidewindersStats {
             </div>`;
         
         $('#leagueTable_wrapper').prepend(quickSortHtml);
-        $('.sort-btn').on('click', (e) => {
+        $('.sort-btn').off('click').on('click', (e) => {
             const button = $(e.currentTarget);
             const columnIndex = parseInt(button.data('sort'));
             const order = button.data('order');
@@ -241,13 +279,19 @@ class SidewindersStats {
         const select = $('#playerSelect');
         select.empty().append('<option value="">Choose a player...</option>');
         this.players.forEach(player => select.append(`<option value="${player}">${player}</option>`));
-        select.off('change').on('change', (e) => { if (e.target.value) this.selectPlayer(e.target.value); });
+        select.off('change').on('change', (e) => {
+            if (e.target.value) this.selectPlayer(e.target.value);
+        });
     }
     
     selectPlayer(playerName) {
         this.selectedPlayer = playerName;
         $('#playerSelect').val(playerName);
         this.showPlayerAnalysis(playerName);
+        // Update URL hash without triggering full reload
+        const url = new URL(window.location.href);
+        url.hash = `player-${encodeURIComponent(playerName)}`;
+        history.replaceState(null, '', url);
     }
     
     showPlayerAnalysis(playerName) {
@@ -275,28 +319,26 @@ class SidewindersStats {
         
         this.calculateAndRenderPartnerships(playerName);
     }
-
+    
     renderFormBadges(playerName) {
-        const playerMatches = this.gameLog
-            .filter(game => game['Player'] === playerName);
-
+        const playerMatches = this.gameLog.filter(game => game['Player'] === playerName);
+        
         playerMatches.sort((a, b) => (parseInt(b['ID']) || 0) - (parseInt(a['ID']) || 0));
-
         const lastFive = playerMatches.slice(0, 5);
         const container = $('#playerFormBadges').empty();
-
-        if(lastFive.length === 0) {
+        
+        if (lastFive.length === 0) {
             container.text('-');
             return;
         }
-
+        
         lastFive.forEach(match => {
             const res = match['Result'] ? match['Result'].trim() : '';
             let badgeColor = 'bg-secondary';
             if (res === 'Win') badgeColor = 'bg-success';
             if (res === 'Draw') badgeColor = 'bg-warning';
             if (res === 'Loss') badgeColor = 'bg-danger';
-
+            
             container.append(`<span class="form-badge ${badgeColor}" title="Match ${match['ID']} | ${match['Date'] || ''}">${res[0] || '?'}</span>`);
         });
     }
@@ -310,33 +352,38 @@ class SidewindersStats {
             const selectedGames = this.gameLog.filter(game => game['Player'] === selectedPlayer);
             const otherGames = this.gameLog.filter(game => game['Player'] === otherPlayer);
             
-            let gamesInCommon = 0, sameTeamGames = 0, winTogether = 0, oppositeTeamGames = 0, selectedWinsVsOther = 0;
+            let gamesInCommon = 0, sameTeamGames = 0, winTogether = 0;
+            let oppositeTeamGames = 0, selectedWinsVsOther = 0;
             
             const selectedGameMap = {};
-            selectedGames.forEach(g => { 
+            selectedGames.forEach(g => {
                 const teamName = g['Team'] ? g['Team'].trim() : '';
-                selectedGameMap[g['ID'] + '|' + teamName] = g; 
+                selectedGameMap[`${g['ID']}|${teamName}`] = g;
             });
             
             const otherGameMap = {};
-            otherGames.forEach(g => { 
+            otherGames.forEach(g => {
                 const teamName = g['Team'] ? g['Team'].trim() : '';
-                otherGameMap[g['ID'] + '|' + teamName] = g; 
+                otherGameMap[`${g['ID']}|${teamName}`] = g;
             });
             
+            // Same team
             Object.keys(selectedGameMap).forEach(key => {
                 if (otherGameMap[key]) {
-                    gamesInCommon++; sameTeamGames++;
+                    gamesInCommon++;
+                    sameTeamGames++;
                     if (selectedGameMap[key]['Result'] && selectedGameMap[key]['Result'].trim() === 'Win') winTogether++;
                 }
             });
             
+            // Opposite team
             selectedGames.forEach(sGame => {
                 otherGames.forEach(oGame => {
                     const sTeam = sGame['Team'] ? sGame['Team'].trim() : 'White';
                     const oTeam = oGame['Team'] ? oGame['Team'].trim() : 'Colour';
                     if (sGame['ID'] === oGame['ID'] && sTeam !== oTeam) {
-                        gamesInCommon++; oppositeTeamGames++;
+                        gamesInCommon++;
+                        oppositeTeamGames++;
                         if (sGame['Result'] && sGame['Result'].trim() === 'Win') selectedWinsVsOther++;
                     }
                 });
@@ -361,7 +408,6 @@ class SidewindersStats {
         if ($.fn.DataTable.isDataTable('#partnershipTable')) {
             $('#partnershipTable').DataTable().destroy();
         }
-        $('#partnershipTable tbody').empty();
         
         $('#partnershipTable').DataTable({
             data: data,
@@ -379,14 +425,14 @@ class SidewindersStats {
             ordering: true,
             order: [[1, 'desc']],
             responsive: true,
-            createdRow: function(row, data) {
-                if(data.sameTeam > 0 && data.winPercentTogether >= 60) $(row).find('td:eq(4)').addClass('table-success-light');
-                if(data.sameTeam > 0 && data.winPercentTogether <= 30) $(row).find('td:eq(4)').addClass('table-danger-light');
-                if(data.oppositeTeam > 0 && data.h2hWinPercent >= 60) $(row).find('td:eq(5)').addClass('table-success-light');
-                if(data.oppositeTeam > 0 && data.h2hWinPercent <= 30) $(row).find('td:eq(5)').addClass('table-danger-light');
+            createdRow: function(row, rowData) {
+                if (rowData.sameTeam > 0 && rowData.winPercentTogether >= 60) $(row).find('td:eq(4)').addClass('table-success-light');
+                if (rowData.sameTeam > 0 && rowData.winPercentTogether <= 30) $(row).find('td:eq(4)').addClass('table-danger-light');
+                if (rowData.oppositeTeam > 0 && rowData.h2hWinPercent >= 60) $(row).find('td:eq(5)').addClass('table-success-light');
+                if (rowData.oppositeTeam > 0 && rowData.h2hWinPercent <= 30) $(row).find('td:eq(5)').addClass('table-danger-light');
             }
         });
-
+        
         $('#partnershipTable tbody').off('click', 'span.clickable-player').on('click', 'span.clickable-player', (event) => {
             const playerName = $(event.target).text().trim();
             if (playerName && this.players.includes(playerName)) this.selectPlayer(playerName);
@@ -394,7 +440,7 @@ class SidewindersStats {
     }
     
     updateLastUpdated() {
-        fetch('GameLog.csv', { method: 'HEAD' })
+        fetch('GameLog.csv', { method: 'HEAD', cache: 'no-store' })
             .then(res => {
                 const lastModified = res.headers.get('last-modified');
                 $('#lastUpdated').text(lastModified ? new Date(lastModified).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'));
@@ -402,8 +448,14 @@ class SidewindersStats {
             .catch(() => $('#lastUpdated').text(new Date().toLocaleDateString('en-GB')));
     }
     
-    showLoading(show) { $('#loadingIndicator').toggle(show); }
-    showError(msg) { $('.container').prepend(`<div class="alert alert-danger"><strong>Error:</strong> ${msg}</div>`); }
+    showLoading(show) {
+        $('#loadingIndicator').toggle(show);
+    }
+    
+    showError(msg) {
+        $('.container').prepend(`<div class="alert alert-danger alert-dismissible fade show" role="alert"><strong>Error:</strong> ${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>`);
+    }
 }
 
+// Initialize the app
 new SidewindersStats();
