@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sidewinders Football – Season Hub</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- DataTables Bootstrap 5 CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/3.2.4/css/fixedHeader.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.9/css/responsive.bootstrap5.min.css">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        :root {
+            --primary-navy: #1a2a3a;
+            --accent-gold: #ffb703;
+            --light-bg: #f8f9fa;
+        }
+
+        body {
+            background-color: var(--light-bg);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #333;
+        }
+
+        .navbar-custom {
+            background-color: var(--primary-navy);
+        }
+
+        .hero-banner {
+            background: linear-gradient(135deg, #1a2a3a 0%, #0d1b2a 100%);
+            color: white;
+            padding: 2.5rem 0;
+            border-bottom: 4px solid var(--accent-gold);
+            margin-bottom: 2rem;
+        }
+
+        .card-custom {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            background: white;
+            margin-bottom: 1.5rem;
+        }
+
+        .clickable-player {
+            color: #0d6efd;
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .clickable-player:hover {
+            text-decoration: underline;
+            color: #0a58ca;
+        }
+
+        .goals-highlight {
+            color: #0d6efd;
+            font-weight: bold;
+        }
+
+        .points-badge {
+            background-color: #198754;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.9em;
+        }
+
+        .stat-card {
+            border-left: 4px solid var(--primary-navy);
+            transition: transform 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+
+        #loadingSpinner {
+            padding: 3rem 0;
+        }
+
+        .table-responsive {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        table.dataTable thead th {
+            background-color: #212529;
+            color: white;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom sticky-top">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#">
+                <i class="fas fa-football-ball text-warning me-2"></i>Sidewinders FC
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="tableNavLink" href="#leagueTableSection">League Table</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="analysisNavLink" href="#analysis">Player Analysis</a>
+                    </li>
+                </ul>
+
+                <!-- Season Dropdown Selector -->
+                <div class="dropdown">
+                    <button class="btn btn-warning dropdown-toggle fw-bold" type="button" id="seasonDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-calendar-alt me-1"></i> <span id="currentSeasonLabel">Current Season</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" id="seasonList" aria-labelledby="seasonDropdown">
+                        <li><a class="dropdown-item" data-season="current" href="#">🏆 Current Season</a></li>
+                        <li><a class="dropdown-item" data-season="archive2526" href="#">📦 2025/26 Season</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" data-season="summer25" href="#">☀️ Summer 2025</a></li>
+                        <li><a class="dropdown-item" data-season="season2425" href="#">📅 2024/25 Season</a></li>
+                        <li><a class="dropdown-item" data-season="season2324" href="#">📅 2023/24 Season</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Banner -->
+    <div class="hero-banner">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center flex-wrap">
+                <div>
+                    <h1 class="display-5 fw-bold mb-1" id="seasonHeading">Current Season</h1>
+                    <p class="lead mb-0 text-light opacity-75">Official Match Statistics & Player Rankings</p>
+                </div>
+                <div class="text-end mt-2 mt-md-0">
+                    <span id="lastUpdated" class="badge bg-secondary p-2">
+                        <i class="fas fa-clock me-1"></i> Checking data status...
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Container -->
+    <div class="container mb-5">
+
+        <!-- Error Banner -->
+        <div id="errorMessage" class="alert alert-danger alert-dismissible fade show d-none" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i><span id="errorText">An error occurred.</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+
+        <!-- Controls Toolbar -->
+        <div class="card card-custom p-3 mb-4" id="leagueTableSection">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <div class="form-check form-switch me-2">
+                        <input class="form-check-input" type="checkbox" id="filterMinGames">
+                        <label class="form-check-label small fw-bold text-muted" for="filterMinGames">Min 5 Games</label>
+                    </div>
+                    <div class="form-check form-switch me-2">
+                        <input class="form-check-input" type="checkbox" id="extendedStatsToggle">
+                        <label class="form-check-label small fw-bold text-muted" for="extendedStatsToggle">Extended Stats</label>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" id="resetSortBtn" title="Reset Sorting">
+                        <i class="fas fa-undo me-1"></i> Reset Sort
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" id="recalcBtn" title="Recalculate Table">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loadingSpinner" class="text-center my-5">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Loading statistics...</span>
+            </div>
+            <p class="text-muted mt-2 fw-bold">Loading match data...</p>
+        </div>
+
+        <!-- League Table Card -->
+        <div id="leagueTableContainer" class="card card-custom p-3 d-none">
+            <div class="table-responsive">
+                <table id="leagueTable" class="table table-hover table-striped align-middle w-100">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Player</th>
+                            <th class="text-center">P</th>
+                            <th class="text-center">W</th>
+                            <th class="text-center">D</th>
+                            <th class="text-center">L</th>
+                            <th class="text-center">Gls</th>
+                            <th class="text-center">OG</th>
+                            <th class="text-center">Ast</th>
+                            <th class="text-center">Pen</th>
+                            <th class="text-center">Pts</th>
+                            <th class="text-center">GPG</th>
+                            <th class="text-center">APG</th>
+                            <th class="text-center">PPG</th>
+                            <th class="text-center">Win %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Rows rendered dynamically by DataTables -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Player Analysis Section -->
+        <div id="analysis" class="mt-5 pt-4 border-top">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3 class="fw-bold mb-0">
+                    <i class="fas fa-user-chart text-primary me-2"></i>Player Performance Analysis
+                </h3>
+                <button class="btn btn-sm btn-outline-success" id="shareButton" disabled>
+                    <i class="fas fa-share-alt me-1"></i> Share Player Link
+                </button>
+            </div>
+
+            <div class="card card-custom p-3 mb-4">
+                <div class="row align-items-center">
+                    <label for="playerSelect" class="col-sm-3 col-form-label fw-bold">Select Player:</label>
+                    <div class="col-sm-9">
+                        <select class="form-select" id="playerSelect">
+                            <option value="">-- Choose a player --</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player Breakdown Cards -->
+            <div id="playerStats" class="d-none">
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3 col-6">
+                        <div class="card card-custom p-3 stat-card text-center">
+                            <span class="text-muted small fw-bold text-uppercase">Matches Played</span>
+                            <h2 class="display-6 fw-bold text-primary mb-0" id="statGames">0</h2>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="card card-custom p-3 stat-card text-center">
+                            <span class="text-muted small fw-bold text-uppercase">Win Rate</span>
+                            <h2 class="display-6 fw-bold text-success mb-0" id="statWinRate">0%</h2>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="card card-custom p-3 stat-card text-center">
+                            <span class="text-muted small fw-bold text-uppercase">Goals</span>
+                            <h2 class="display-6 fw-bold text-danger mb-0" id="statGoals">0</h2>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="card card-custom p-3 stat-card text-center">
+                            <span class="text-muted small fw-bold text-uppercase">Assists</span>
+                            <h2 class="display-6 fw-bold text-warning mb-0" id="statAssists">0</h2>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Form & Game Breakdown -->
+                <div class="card card-custom p-4">
+                    <h5 class="fw-bold mb-3"><i class="fas fa-history me-2 text-info"></i>Recent Game Log</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover" id="playerGameLogTable">
+                            <thead>
+                                <tr>
+                                    <th>Match ID</th>
+                                    <th>Date</th>
+                                    <th>Team</th>
+                                    <th>Result</th>
+                                    <th class="text-center">Goals</th>
+                                    <th class="text-center">Assists</th>
+                                    <th class="text-center">Own Goals</th>
+                                </tr>
+                            </thead>
+                            <tbody id="playerGameLogBody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
+    
+    <script src="app.js"></script>
+
+    <script>
+        // Deep-linking hash handler
+        $(window).on('load', () => {
+            setTimeout(() => {
+                const hash = window.location.hash;
+                if (hash && hash.startsWith('#player-')) {
+                    const playerName = decodeURIComponent(hash.substring(8));
+                    if (window.sidewindersApp && window.sidewindersApp.players && window.sidewindersApp.players.includes(playerName)) {
+                        window.sidewindersApp.selectPlayer(playerName);
+                        $('html, body').animate({ scrollTop: $('#analysis').offset().top - 20 }, 500);
+                    }
+                }
+            }, 600);
+        });
+    </script>
+</body>
+</html>
